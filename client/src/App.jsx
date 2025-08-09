@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import dayjs from 'dayjs';
 import { api } from './api';
@@ -17,7 +16,7 @@ function SignIn({ onDone }){
   return (
     <div className="container">
       <div className="card">
-        <h2>Asa</h2>
+        <h2>heterodox</h2>
         <p className="muted">A daily spark: ask a question in the morning, read anonymized answers from your circle at 20:00.</p>
         <div className="row">
           <input placeholder="Display name" value={name} onChange={e=>setName(e.target.value)} />
@@ -27,6 +26,69 @@ function SignIn({ onDone }){
           <button className="secondary" onClick={()=>setMode(mode==='register'?'login':'register')}>
             Switch to {mode==='register'?'Sign in':'Register'}
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** NEW: Welcome screen for invite links (unauthenticated) */
+function WelcomeInvite({ token }) {
+  const [answer, setAnswer] = useState('');
+  const [error, setError]   = useState(null);
+  const [busy, setBusy]     = useState(false);
+
+  const minLen = 10;
+
+  const shareAndJoin = async () => {
+    setError(null);
+    const a = answer.trim();
+    if (a.length < minLen) {
+      setError(`Please write at least ${minLen} characters.`);
+      return;
+    }
+    try {
+      setBusy(true);
+      // Stash the answer so we can finish after Google auth redirects back.
+      localStorage.setItem('pendingInvite', JSON.stringify({ token, answer: a }));
+      // Kick off Google Sign-In (server will redirect back to frontend root)
+      window.location.href = '/api/auth/google';
+    } catch (e) {
+      setBusy(false);
+      setError(e.message || 'Something went wrong.');
+    }
+  };
+
+  return (
+    <div className="container">
+      <div className="card">
+        <h2>Welcome to heterodox</h2>
+        <p className="muted">
+          To join this community, first share your answer to the starter prompt below.
+        </p>
+        <div style={{marginTop:12}}>
+          <div className="pill">Prompt</div>
+          <h3 style={{marginTop:8}}>What is the most interesting question you’ve ever been asked?</h3>
+        </div>
+        <div style={{marginTop:8}}>
+          <textarea
+            rows="5"
+            placeholder="Write your answer…"
+            value={answer}
+            onChange={e=>setAnswer(e.target.value)}
+          />
+          <div className="muted" style={{marginTop:6}}>
+            {answer.trim().length}/{minLen} minimum
+          </div>
+        </div>
+        {error && <div className="muted" style={{color:'crimson', marginTop:8}}>{error}</div>}
+        <div style={{marginTop:12}}>
+          <button onClick={shareAndJoin} disabled={busy || answer.trim().length < minLen}>
+            {busy ? 'Redirecting…' : 'Share & Join with Google'}
+          </button>
+        </div>
+        <div className="muted" style={{marginTop:8}}>
+          You’ll be prompted to sign in with Google to create your account and save your answer.
         </div>
       </div>
     </div>
@@ -245,19 +307,57 @@ function Nav({ me, onLogout, tab, setTab }){
 export default function App(){
   const [me,setMe]=useState(null);
   const [tab,setTab]=useState('Ask');
+
+  const inviteToken = new URLSearchParams(window.location.search).get('invite') || null;
+  if (!me && inviteToken) return <WelcomeInvite token={inviteToken} />;
+
+  // After login, finalize any pending invite we stashed before auth.
+  const finishPendingInvite = async () => {
+    const raw = localStorage.getItem('pendingInvite');
+    if (!raw) return;
+    try {
+      const { token, answer } = JSON.parse(raw);
+      if (!token || !answer) return;
+      await api('/api/invite/accept', {
+        method: 'POST',
+        body: JSON.stringify({ token, answer })
+      });
+    } catch (e) {
+      // You may want to surface this in UI; for now, log it.
+      console.error('Failed to finalize invite:', e);
+    } finally {
+      localStorage.removeItem('pendingInvite');
+    }
+  };
+
   const load = async()=>{
-    const j = await api('/api/me'); setMe(j.user);
+    const j = await api('/api/me'); 
+    setMe(j.user);
+    if (j.user) {
+      await finishPendingInvite();
+    }
   };
   useEffect(()=>{ load(); },[]);
 
   const logout = async()=>{ await api('/api/logout',{method:'POST'}); setMe(null); };
 
-  if (!me) return <SignIn onDone={load} />;
+  // NEW: If unauthenticated AND invite token exists → show WelcomeInvite first.
+  if (!me && inviteToken) return <WelcomeInvite token={inviteToken} />;
+
+  if (!me) return (
+    <div className="container">
+      <SignIn onDone={load} />
+      {/* Optional: keep a Google CTA for non-invite users */}
+      <div style={{marginTop:16, textAlign:'center'}}>
+        <a href="/api/auth/google" className="btn">Continue with Google</a>
+      </div>
+    </div>
+  );
 
   return (
     <div className="container">
       <Nav me={me} onLogout={logout} tab={tab} setTab={setTab} />
-      <a href="/api/auth/google" className="btn">Continue with Google</a>
+      {/* Moved Google CTA out of the logged-in view; not needed once authenticated */}
       {tab==='Ask' && <Ask />}
       {tab==='Answer' && <Answer />}
       {tab==='Reveal' && <Reveal />}

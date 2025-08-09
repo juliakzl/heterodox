@@ -6,6 +6,8 @@ import session from 'express-session';
 import passport from 'passport';
 
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
+import * as Invites from './invites.js';
+import * as Signup from './signup.js';
 
 const app = express();
 
@@ -283,6 +285,52 @@ app.post('/api/answers/:id/vote', (req, res) => {
   }
 });
 
+// Accept invite + store onboarding answer (runs AFTER Google sign-in)
+// Body: { token: string, answer: string }
+app.post('/api/invite/accept', (req, res) => {
+  const me = requireUser(req, res); if (!me) return;
+  const { token, answer } = req.body || {};
+
+  if (!token || typeof token !== 'string') {
+    return res.status(400).json({ error: 'missing_token' });
+  }
+  if (!answer || answer.trim().length < 10) {
+    return res.status(400).json({ error: 'answer_min_10' });
+  }
+
+  const invite = Invites.getInvite(token);
+  if (!invite) {
+    return res.status(404).json({ error: 'invite_not_found' });
+  }
+
+  // idempotent-ish: if already accepted by this user, we still save (update) the answer
+  if (invite.accepted_by_user_id && invite.accepted_by_user_id !== me.id) {
+    return res.status(409).json({ error: 'invite_already_used' });
+  }
+
+  // persist onboarding answer
+  Signup.saveOnboardingAnswer({
+    userId: me.id,
+    token,
+    promptKey: 'most_interesting_question',
+    answer: answer.trim(),
+    createdAt: nowIso()
+  });
+
+  // mark invite accepted
+  Invites.markAccepted({ token, userId: me.id, acceptedAt: nowIso() });
+
+  return res.json({ ok: true });
+});
+
+// temporary debug route – remove later
+app.post('/api/invite/debug/create', (req, res) => {
+  const token = (req.body?.token || Math.random().toString(36).slice(2)).toLowerCase();
+  const inviterId = req.body?.inviterId || null;
+  Invites.createInvite({ token, inviterId, createdAt: nowIso() });
+  res.json({ token });
+});
+
 // Utility: search users
 app.get('/api/users/search', (req, res) => {
   const q = (req.query.q || '').trim().toLowerCase();
@@ -295,7 +343,7 @@ app.get('/api/users/search', (req, res) => {
 const PORT = process.env.PORT || 4000;
 
 app.get('/', (_req, res) => {
-  res.redirect('http://localhost:5174/');
+  res.redirect('http://localhost:5173/');
 });
 
 app.listen(PORT, () => {
