@@ -310,13 +310,14 @@ app.get('/api/weekly', (req, res) => {
     // Optionally include a small first page of answers only in reveal
     if (phase === 'reveal') {
       payload.answers = db.prepare(`
-        SELECT a.id, a.text, a.created_at,
-               (SELECT COUNT(*) FROM votes v WHERE v.answer_id = a.id) AS votes
-        FROM answers a
-        WHERE a.question_id = ?
-        ORDER BY votes DESC, a.created_at ASC
-        LIMIT 20
-      `).all(q.id);
+  SELECT a.id, a.text, a.created_at, u.display_name AS respondent_name,
+         (SELECT COUNT(*) FROM votes v WHERE v.answer_id = a.id) AS votes
+  FROM answers a
+  JOIN users u ON u.id = a.respondent_id
+  WHERE a.question_id = ?
+  ORDER BY votes DESC, a.created_at ASC
+  LIMIT 20
+`).all(q.id);
     }
 
     res.json(payload);
@@ -375,13 +376,14 @@ app.get('/api/weekly/:week_start/answers', (req, res) => {
     if (!qrow) return res.status(404).json({ error: 'weekly_not_found' });
 
     const answers = db.prepare(`
-      SELECT a.id, a.text, a.created_at,
-             (SELECT COUNT(*) FROM votes v WHERE v.answer_id = a.id) AS votes
-      FROM answers a
-      WHERE a.question_id = ?
-      ORDER BY votes DESC, a.created_at ASC
-      LIMIT 200
-    `).all(qrow.question_id);
+  SELECT a.id, a.text, a.created_at, u.display_name AS respondent_name,
+         (SELECT COUNT(*) FROM votes v WHERE v.answer_id = a.id) AS votes
+  FROM answers a
+  JOIN users u ON u.id = a.respondent_id
+  WHERE a.question_id = ?
+  ORDER BY votes DESC, a.created_at ASC
+  LIMIT 200
+`).all(qrow.question_id);
 
     return res.json({
       week_start: qrow.week_start,
@@ -485,12 +487,13 @@ app.get('/api/questions/:id/answers', (req, res) => {
   if (!isAfterReveal(q.qdate)) return res.status(403).json({ error: 'before_reveal_20' });
 
   const answers = db.prepare(`
-    SELECT a.id, a.text, a.created_at,
-      (SELECT COUNT(*) FROM votes v WHERE v.answer_id = a.id) as votes
-    FROM answers a
-    WHERE a.question_id = ?
-    ORDER BY votes DESC, a.created_at ASC
-  `).all(q.id);
+  SELECT a.id, a.text, a.created_at, u.display_name AS respondent_name,
+    (SELECT COUNT(*) FROM votes v WHERE v.answer_id = a.id) as votes
+  FROM answers a
+  JOIN users u ON u.id = a.respondent_id
+  WHERE a.question_id = ?
+  ORDER BY votes DESC, a.created_at ASC
+`).all(q.id);
   res.json({ answers });
 });
 

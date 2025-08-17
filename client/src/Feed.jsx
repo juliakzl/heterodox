@@ -112,11 +112,26 @@ export default function WeeklyFeed(){
           const ans = answersByWeek[w.week_start] || [];
           const isLoading = !!loadingAns[w.week_start];
           const ansErr = errorAns[w.week_start];
+
           return (
             <div key={w.week_start} className="answer">
+              {/* 1) Week pill */}
+              <div className="pill">Week starting {w.week_start}</div>
+
+              {/* 2) Question text */}
+              <div style={{marginTop:6, marginBottom:6}}>
+                {w?.question?.text || <span className="muted">No question recorded</span>}
+              </div>
+
+              {/* 3) Answers count pill (optional) */}
+              {typeof w.answers_count === 'number' && (
+                <div className="pill">{w.answers_count} answers</div>
+              )}
+
+              {/* 4) Chevron toggle row BELOW the question */}
               <div
                 className="row"
-                style={{alignItems:'center'}}
+                style={{alignItems:'center', marginTop:4}}
                 aria-expanded={isOpen}
                 aria-controls={`answers-${w.week_start}`}
               >
@@ -128,16 +143,10 @@ export default function WeeklyFeed(){
                 >
                   <Arrow open={isOpen} disabled={!hasQ} />
                 </span>
-                <div className="pill" style={{marginLeft:8}}>Week starting {w.week_start}</div>
                 <div style={{flex:1}}></div>
               </div>
-              <div style={{marginTop:6, marginBottom:6}}>
-                {w?.question?.text || <span className="muted">No question recorded</span>}
-              </div>
-              {typeof w.answers_count === 'number' && (
-                <div className="pill">{w.answers_count} answers</div>
-              )}
 
+              {/* 5) Collapsible answers */}
               {isOpen && (
                 <div id={`answers-${w.week_start}`} style={{marginTop:8, borderTop:'1px solid #eee', paddingTop:8}}>
                   {isLoading && <div className="muted">Loading answers…</div>}
@@ -149,7 +158,9 @@ export default function WeeklyFeed(){
                     <div className="list">
                       {ans.map(a => (
                         <div key={a.id} className="answer">
-                          <div className="muted">{dayjs(a.created_at).format('YYYY-MM-DD HH:mm')}</div>
+                          <div className="muted">
+  {(a.respondent_name || 'Unknown')} • {dayjs(a.created_at).format('YYYY-MM-DD HH:mm')}
+</div>
                           <div style={{marginTop:6, marginBottom:6}}>{a.text}</div>
                           <div className="pill">{a.votes} upvotes</div>
                         </div>

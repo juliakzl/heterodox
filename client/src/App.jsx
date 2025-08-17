@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import dayjs from 'dayjs';
 import { api } from './api';
 import MatisseTheme from './MatisseTheme';
@@ -205,7 +205,9 @@ function TodayMain({ setTab }) {
           <div className="list">
             {weekly.answers.map(a => (
               <div key={a.id} className="answer">
-                <div className="muted">Anonymous • {dayjs(a.created_at).format('HH:mm')}</div>
+                <div className="muted">
+  {(a.respondent_name || 'Unknown')} • {dayjs(a.created_at).format('HH:mm')}
+</div>
                 <div style={{marginTop:6, marginBottom:6}}>{a.text}</div>
                 <div className="pill">{a.votes} upvotes</div>
               </div>
