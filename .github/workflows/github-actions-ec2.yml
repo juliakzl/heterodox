@@ -1,0 +1,83 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: heterodox-main
+      cancel-in-progress: true
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Build client
+        working-directory: client
+        run: |
+          npm ci
+          npm run build
+
+      - name: Ensure target dirs on VM
+        uses: appleboy/ssh-action@master
+        with:
+          host:     ec2-18-199-237-58.eu-central-1.compute.amazonaws.com
+          username: ubuntu
+          key:      ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+            mkdir -p /home/ubuntu/heterodox/client/dist
+            mkdir -p /home/ubuntu/heterodox/server
+
+      - name: Deploy client build
+        uses: easingthemes/ssh-deploy@main
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
+          REMOTE_HOST:      ec2-18-199-237-58.eu-central-1.compute.amazonaws.com
+          REMOTE_USER:      ubuntu
+          ARGS:             "-avzr --delete"
+          SOURCE:           "client/dist/"
+          TARGET:           "/home/ubuntu/heterodox/client/dist"
+
+      # --- OPTIONAL: deploy backend code as well ---
+      - name: Deploy server code (optional)
+        if: ${{ vars.DEPLOY_SERVER == 'true' }}
+        uses: easingthemes/ssh-deploy@main
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
+          REMOTE_HOST:      ec2-18-199-237-58.eu-central-1.compute.amazonaws.com
+          REMOTE_USER:      ubuntu
+          ARGS:             "-avzr --delete --exclude='.git' --exclude='node_modules'"
+          SOURCE:           "server/"
+          TARGET:           "/home/ubuntu/heterodox/server"
+
+      - name: Post-deploy (restart backend, reload Caddy)
+        uses: appleboy/ssh-action@master
+        with:
+          host:     ec2-18-199-237-58.eu-central-1.compute.amazonaws.com
+          username: ubuntu
+          key:      ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+            if [ "${{ vars.DEPLOY_SERVER }}" = "true" ]; then
+              cd /home/ubuntu/heterodox/server
+              npm ci --omit=dev
+              sudo systemctl restart heterodox-api
+            fi
+            # Static files don't require this, but harmless if config changed:
+            sudo systemctl reload caddy || true
+            echo "${GITHUB_SHA}" > /home/ubuntu/heterodox/.deployed_sha
+            date -u > /home/ubuntu/heterodox/.deployed_at
