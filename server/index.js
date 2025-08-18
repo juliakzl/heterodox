@@ -171,7 +171,8 @@ app.get('/api/auth/google/callback',
   passport.authenticate('google', { failureRedirect: '/api/auth/fail?reason=invite' }),
   (req, res) => {
     req.session.user = { id: req.user.id, displayName: req.user.displayName || req.user.display_name };
-    res.redirect('http://localhost:5173/');
+    const base = (process.env.BASE_URL || 'http://localhost:5173').replace(/\/+$/,'');
+    res.redirect(base + '/');
   }
 );
 

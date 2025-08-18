@@ -477,7 +477,7 @@ export default function App(){
       <>
         <MatisseTheme />
         <div className="container" style={{textAlign: 'center', marginTop: '20vh'}}>
-          <h2>Welcome back</h2>
+          <h2>Welcome back!</h2>
           <p className="muted">Sign in to continue</p>
           <a href="/api/auth/google" className="btn">Continue with Google</a>
         </div>
