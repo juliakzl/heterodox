@@ -34,9 +34,9 @@ jobs:
       - name: Ensure target dirs on VM
         uses: appleboy/ssh-action@master
         with:
-          host:     ${{ secrets.HOST_DNS }}        # IP or DNS of your EC2
-          username: ${{ secrets.USERNAME }}        # typically "ubuntu"
-          key:      ${{ secrets.EC2_SSH_KEY }}     # PEM private key contents
+          host:     ec2-18-199-237-58.eu-central-1.compute.amazonaws.com
+          username: ubuntu
+          key:      ${{ secrets.EC2_SSH_KEY }}
           script: |
             set -e
             mkdir -p /home/ubuntu/heterodox/client/dist
