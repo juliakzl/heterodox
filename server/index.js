@@ -87,6 +87,18 @@ function currentWeeklyPhase(weekStartStr, now = dayjs()) {
   return 'reveal';
 }
 
+// Resolve public base URL: prefer env; in prod fall back to forwarded proto/host; dev => localhost:5173
+function baseUrlFromReq(req) {
+  const env = (process.env.BASE_URL || '').trim();
+  if (env) return env.replace(/\/+$/, '');
+  if (process.env.NODE_ENV === 'production') {
+    const proto = String(req.headers['x-forwarded-proto'] || req.protocol || 'http').split(',')[0];
+    const host  = String(req.headers['x-forwarded-host'] || req.headers['host'] || '').trim();
+    if (host) return `${proto}://${host}`.replace(/\/+$/, '');
+  }
+  return 'http://localhost:5173';
+}
+
 function getWeeklyQuestionRow(weekStartStr) {
   return db.prepare(`
     SELECT q.id, q.user_id, u.display_name AS owner_name, q.text, q.qdate
@@ -105,7 +117,7 @@ passport.use(new GoogleStrategy(
   {
     clientID: process.env.GOOGLE_CLIENT_ID || '',
     clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
-    callbackURL: '/api/auth/google/callback', // nginx keeps scheme/host
+    callbackURL: '/api/auth/google/callback', // reverse proxy keeps scheme/host
     passReqToCallback: true
   },
   (req, accessToken, refreshToken, profile, done) => {
@@ -171,7 +183,7 @@ app.get('/api/auth/google/callback',
   passport.authenticate('google', { failureRedirect: '/api/auth/fail?reason=invite' }),
   (req, res) => {
     req.session.user = { id: req.user.id, displayName: req.user.displayName || req.user.display_name };
-    const base = (process.env.BASE_URL || 'http://localhost:5173').replace(/\/+$/,'');
+    const base = baseUrlFromReq(req);
     res.redirect(base + '/');
   }
 );
@@ -574,8 +586,8 @@ app.get('/api/users/search', (req, res) => {
 
 const PORT = process.env.PORT || 4000;
 
-app.get('/', (_req, res) => {
-  res.redirect('http://localhost:5173/');
+app.get('/', (req, res) => {
+  res.redirect(baseUrlFromReq(req) + '/');
 });
 
 app.listen(PORT, () => {
