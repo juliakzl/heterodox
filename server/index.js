@@ -192,7 +192,7 @@ app.get('/api/auth/google/callback',
   (req, res) => {
     req.session.user = { id: req.user.id, displayName: req.user.displayName || req.user.display_name };
     const base = baseUrlFromReq(req);
-    res.redirect(base + '/');
+    res.redirect('/');
   }
 );
 
