@@ -595,7 +595,14 @@ app.get('/api/users/search', (req, res) => {
 const PORT = process.env.PORT || 4000;
 
 app.get('/', (req, res) => {
-  res.redirect(baseUrlFromReq(req) + '/');
+  const expected = (process.env.BASE_URL || '').trim().replace(/\/+$/, '');
+  const base = baseUrlFromReq(req);
+  // Only redirect if we're not already on the expected public origin
+  if (expected && base !== expected) {
+    return res.redirect(expected + '/');
+  }
+  // Otherwise, don't redirect to self—return a simple 200
+  res.status(200).type('text/plain').send('OK');
 });
 
 app.listen(PORT, () => {
