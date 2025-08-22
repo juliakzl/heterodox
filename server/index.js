@@ -91,12 +91,20 @@ function currentWeeklyPhase(weekStartStr, now = dayjs()) {
 function baseUrlFromReq(req) {
   const env = (process.env.BASE_URL || '').trim();
   if (env) return env.replace(/\/+$/, '');
-  if (process.env.NODE_ENV === 'production') {
-    const proto = String(req.headers['x-forwarded-proto'] || req.protocol || 'http').split(',')[0];
-    const host  = String(req.headers['x-forwarded-host'] || req.headers['host'] || '').trim();
-    if (host) return `${proto}://${host}`.replace(/\/+$/, '');
+
+  const proto = String(req.headers['x-forwarded-proto'] || req.protocol || 'http').split(',')[0];
+  const host  = String(req.headers['x-forwarded-host'] || req.headers['host'] || '').trim();
+
+  if (host) {
+    return `${proto}://${host}`.replace(/\/+$/, '');
   }
-  return 'http://localhost:5173';
+
+  if (process.env.NODE_ENV !== 'production') {
+    return 'http://localhost:5173';
+  }
+
+  console.error('Cannot determine public base URL in production. Set BASE_URL or fix proxy headers.');
+  return '/';
 }
 
 function getWeeklyQuestionRow(weekStartStr) {
