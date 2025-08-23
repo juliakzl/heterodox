@@ -28,11 +28,12 @@ jobs:
       - name: Build client
         working-directory: client
         run: |
+          set -euo pipefail
           npm ci
           npm run build
 
       - name: Ensure target dirs on VM
-        uses: appleboy/ssh-action@v0.1.10
+        uses: appleboy/ssh-action@v1.2.2
         with:
           host:     ec2-18-199-237-58.eu-central-1.compute.amazonaws.com
           username: ubuntu
@@ -43,7 +44,7 @@ jobs:
             mkdir -p /home/ubuntu/heterodox/server
 
       - name: Deploy client build
-        uses: easingthemes/ssh-deploy@v5.0.4
+        uses: easingthemes/ssh-deploy@v5.1.0
         env:
           SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
           REMOTE_HOST:      ec2-18-199-237-58.eu-central-1.compute.amazonaws.com
@@ -55,12 +56,12 @@ jobs:
       # --- OPTIONAL: deploy backend code as well ---
       - name: Deploy server code (optional)
         if: ${{ vars.DEPLOY_SERVER == 'true' }}
-        uses: easingthemes/ssh-deploy@v5.0.4
+        uses: easingthemes/ssh-deploy@v5.1.0
         env:
           SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
           REMOTE_HOST:      ec2-18-199-237-58.eu-central-1.compute.amazonaws.com
           REMOTE_USER:      ubuntu
-          # prevent secret & DB clobber; keep node_modules deleted remotely
+          # Prevent secrets/DB clobber; keep node_modules deleted remotely
           ARGS: >-
             -avzr --delete
             --exclude='.git'
@@ -71,7 +72,7 @@ jobs:
           TARGET:           "/home/ubuntu/heterodox/server"
 
       - name: Post-deploy (restart backend if deployed; reload Caddy)
-        uses: appleboy/ssh-action@v0.1.10
+        uses: appleboy/ssh-action@v1.2.2
         with:
           host:     ec2-18-199-237-58.eu-central-1.compute.amazonaws.com
           username: ubuntu
@@ -80,14 +81,13 @@ jobs:
             set -euo pipefail
             if [ "${{ vars.DEPLOY_SERVER }}" = "true" ]; then
               cd /home/ubuntu/heterodox/server
-              # build native deps for the VM's node version
               npm ci --omit=dev
-              # restart the correct service name
+              # restart the correct systemd unit name
               sudo systemctl restart heterodox
-              # optional: health check upstream
+              # local health check of upstream
               curl -fsSI http://127.0.0.1:4000/ >/dev/null
             fi
             # Reload Caddy (harmless if unchanged)
             sudo systemctl reload caddy || true
-            echo "${{ github.sha }}" > /home/ubuntu/heterodox/.deployed_sha
-            date -u > /home/ubuntu/heterodox/.deployed_at
+            echo "${{ github.sha }}" | sudo tee /home/ubuntu/heterodox/.deployed_sha >/dev/null
+            date -u | sudo tee /home/ubuntu/heterodox/.deployed_at >/dev/null
