@@ -267,8 +267,17 @@ app.get(
       id: req.user.id,
       displayName: req.user.displayName || req.user.display_name,
     };
-    const base = baseUrlFromReq(req);
-    res.redirect("/");
+    const expected = (process.env.BASE_URL || "").trim().replace(/\/+$/, "");
+    if (expected) {
+      // Always send the browser to the public frontend origin after OAuth
+      return res.redirect(expected + "/");
+    }
+    // Dev fallback if BASE_URL isn't set
+    if (process.env.NODE_ENV !== "production") {
+      return res.redirect("http://localhost:5173/");
+    }
+    // Last resort: stay on current origin
+    return res.redirect("/");
   }
 );
 
@@ -793,12 +802,16 @@ const PORT = process.env.PORT || 4000;
 app.get("/", (req, res) => {
   const expected = (process.env.BASE_URL || "").trim().replace(/\/+$/, "");
   const base = baseUrlFromReq(req);
-  // Only redirect if we're not already on the expected public origin
   if (expected && base !== expected) {
     return res.redirect(expected + "/");
   }
-  // Otherwise, don't redirect to self—return a simple 200
-  res.status(200).type("text/plain").send("OK");
+  // Serve the SPA index so the UI mounts
+  return res.sendFile(path.join(publicPath, "index.html"));
+});
+
+// SPA fallback: any non-API route should return the client app
+app.get(/^\/(?!api\/).*/, (req, res) => {
+  return res.sendFile(path.join(publicPath, "index.html"));
 });
 
 app.listen(PORT, () => {

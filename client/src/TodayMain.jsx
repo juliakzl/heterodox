@@ -1,4 +1,21 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import dayjs from "dayjs";
+
+// Minimal API helper: uses credentials for session cookie; works in dev & prod
+const API_BASE = import.meta.env.DEV ? "http://localhost:4000" : "";
+async function api(path, options = {}) {
+  const res = await fetch(`${API_BASE}${path}`, {
+    credentials: "include",
+    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+    ...options,
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(text || `HTTP ${res.status}`);
+  }
+  const ct = res.headers.get("content-type") || "";
+  return ct.includes("application/json") ? res.json() : res.text();
+}
 
 export default function TodayMain({ setTab }) {
   const [loading, setLoading] = useState(true);
