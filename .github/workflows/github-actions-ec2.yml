@@ -18,7 +18,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Setup Node (for client build)
         uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -28,22 +28,23 @@ jobs:
       - name: Build client
         working-directory: client
         run: |
+          set -euo pipefail
           npm ci
           npm run build
 
       - name: Ensure target dirs on VM
-        uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@v1.2.2
         with:
           host:     ec2-18-199-237-58.eu-central-1.compute.amazonaws.com
           username: ubuntu
           key:      ${{ secrets.EC2_SSH_KEY }}
           script: |
-            set -e
+            set -euo pipefail
             mkdir -p /home/ubuntu/heterodox/client/dist
             mkdir -p /home/ubuntu/heterodox/server
 
       - name: Deploy client build
-        uses: easingthemes/ssh-deploy@main
+        uses: easingthemes/ssh-deploy@v5.1.0
         env:
           SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
           REMOTE_HOST:      ec2-18-199-237-58.eu-central-1.compute.amazonaws.com
@@ -55,29 +56,38 @@ jobs:
       # --- OPTIONAL: deploy backend code as well ---
       - name: Deploy server code (optional)
         if: ${{ vars.DEPLOY_SERVER == 'true' }}
-        uses: easingthemes/ssh-deploy@main
+        uses: easingthemes/ssh-deploy@v5.1.0
         env:
           SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
           REMOTE_HOST:      ec2-18-199-237-58.eu-central-1.compute.amazonaws.com
           REMOTE_USER:      ubuntu
-          ARGS:             "-avzr --delete --exclude='.git' --exclude='node_modules'"
+          # Prevent secrets/DB clobber; keep node_modules deleted remotely
+          ARGS: >-
+            -avzr --delete
+            --exclude='.git'
+            --exclude='node_modules'
+            --exclude='.env'
+            --exclude='asa.db'
           SOURCE:           "server/"
           TARGET:           "/home/ubuntu/heterodox/server"
 
-      - name: Post-deploy (restart backend, reload Caddy)
-        uses: appleboy/ssh-action@master
+      - name: Post-deploy (restart backend if deployed; reload Caddy)
+        uses: appleboy/ssh-action@v1.2.2
         with:
           host:     ec2-18-199-237-58.eu-central-1.compute.amazonaws.com
           username: ubuntu
           key:      ${{ secrets.EC2_SSH_KEY }}
           script: |
-            set -e
+            set -euo pipefail
             if [ "${{ vars.DEPLOY_SERVER }}" = "true" ]; then
               cd /home/ubuntu/heterodox/server
               npm ci --omit=dev
-              sudo systemctl restart heterodox-api
+              # restart the correct systemd unit name
+              sudo systemctl restart heterodox
+              # local health check of upstream
+              curl -fsSI http://127.0.0.1:4000/ >/dev/null
             fi
-            # Static files don't require this, but harmless if config changed:
+            # Reload Caddy (harmless if unchanged)
             sudo systemctl reload caddy || true
-            echo "${GITHUB_SHA}" > /home/ubuntu/heterodox/.deployed_sha
-            date -u > /home/ubuntu/heterodox/.deployed_at
+            echo "${{ github.sha }}" | sudo tee /home/ubuntu/heterodox/.deployed_sha >/dev/null
+            date -u | sudo tee /home/ubuntu/heterodox/.deployed_at >/dev/null
