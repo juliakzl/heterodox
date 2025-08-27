@@ -20,7 +20,6 @@ async function api(path, options = {}) {
 export default function TodayMain({ setTab }) {
   const [loading, setLoading] = useState(true);
   const [weekly, setWeekly] = useState(null); // payload from /api/weekly
-  const [draft, setDraft] = useState("");
   const [error, setError] = useState(null);
 
   const fetchWeekly = async () => {
@@ -39,50 +38,6 @@ export default function TodayMain({ setTab }) {
   useEffect(() => {
     fetchWeekly();
   }, []);
-  const shareWeekly = async () => {
-    const q = weekly?.question;
-    if (!q) return;
-    const shareData = {
-      title: "This Week’s Question",
-      text: q.text,
-      url:
-        window.location.origin +
-        "?week=" +
-        encodeURIComponent(weekly?.week_start || ""),
-    };
-    try {
-      if (navigator.share) {
-        await navigator.share(shareData);
-      } else {
-        await navigator.clipboard.writeText(
-          `${shareData.title}\n\n${shareData.text}\n${shareData.url}`
-        );
-        alert("Link copied to clipboard.");
-      }
-    } catch (_) {
-      // user likely canceled; ignore
-    }
-  };
-
-  const submit = async () => {
-    const text = draft.trim();
-    const q = weekly?.question;
-    if (!q) return;
-    if (text.length < 3) {
-      alert("Please write at least 3 characters.");
-      return;
-    }
-    try {
-      await api("/api/answers", {
-        method: "POST",
-        body: JSON.stringify({ questionId: q.id, text }),
-      });
-      setDraft("");
-      await fetchWeekly();
-    } catch (e) {
-      alert(e.message || "Failed to submit your answer.");
-    }
-  };
 
   if (loading) {
     return (
@@ -105,8 +60,6 @@ export default function TodayMain({ setTab }) {
   }
 
   const q = weekly?.question || null;
-  const phase = weekly?.phase;
-  const iAnswered = !!weekly?.iAnswered;
 
   if (!q) {
     return (

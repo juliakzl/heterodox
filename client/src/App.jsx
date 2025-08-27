@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import dayjs from "dayjs";
 import { api } from "./api";
 import MatisseTheme from "./MatisseTheme";
 import WeeklyFeed from "./Feed";
@@ -10,7 +9,6 @@ import Connections from "./Connections";
 import Nav from "./Nav";
 
 export default function App() {
-  console.log("hi!");
 
   const [me, setMe] = useState(null);
   const [tab, setTab] = useState("Main");

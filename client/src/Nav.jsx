@@ -1,4 +1,4 @@
-export default function Nav({ me, onLogout, tab, setTab }) {
+export default function Nav({ me, onLogout }) {
   return (
     <div className="card" style={{ position: "sticky", top: 0, zIndex: 10 }}>
       <div className="row" style={{ alignItems: "center" }}>

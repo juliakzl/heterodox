@@ -765,13 +765,30 @@ app.post("/api/invite/accept", (req, res) => {
 });
 
 // temporary debug route – remove later
-app.post("/api/invite/debug/create", (req, res) => {
+app.post("/api/invite/create", (req, res) => {
+  // Require a signed-in user; trust the server-side session for inviter identity
+  const me = requireUser(req, res);
+  if (!me) return;
+
   const token = (
     req.body?.token || Math.random().toString(36).slice(2)
   ).toLowerCase();
-  const inviterId = req.body?.inviterId || null;
-  Invites.createInvite({ token, inviterId, createdAt: nowIso() });
-  res.json({ token });
+
+  // Optional metadata to store with the invite (if your schema supports it)
+  const firstName = req.body?.firstName?.trim() || null;
+  const lastName  = req.body?.lastName?.trim()  || null;
+
+  // Persist with inviterId taken from the session user
+  Invites.createInvite({
+    token,
+    inviterId: me.id,
+    firstName,
+    lastName,
+    createdAt: nowIso(),
+  });
+
+  // Include inviterId in the response for easy debugging/confirmation
+  res.json({ token, inviterId: me.id });
 });
 
 // Utility: search users

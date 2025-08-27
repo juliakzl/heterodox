@@ -1,5 +1,4 @@
 /* eslint-env browser */
-/* eslint-disable react/prop-types */
 import { useEffect, useState } from "react";
 
 // Local API helper (keeps sessions via cookies). Replace with your shared helper if present.
@@ -139,7 +138,12 @@ export default function Ask({ onClose = () => {} }) {
               style={{ width: "100%" }}
             />
             <div style={{ marginTop: 8 }}>
-              <button type="button" onClick={() => { void post(); }}>
+              <button
+                type="button"
+                onClick={() => {
+                  void post();
+                }}
+              >
                 Post question
               </button>
             </div>
