@@ -281,6 +281,18 @@ passport.use(
           acceptedAt: nowIso(),
         });
 
+        // Immediately connect inviter & new user (idempotent; relies on UNIQUE constraint)
+        try {
+          const inviterId = (invite && (invite.inviter_id ?? invite.inviterId)) || null;
+          if (inviterId) {
+            connectBothWays(inviterId, Number(info.lastInsertRowid), nowIso());
+          } else {
+            console.warn("Invite present but no inviter_id; skipping auto-connect for user", info.lastInsertRowid);
+          }
+        } catch (e) {
+          console.error("auto-connect on signup failed:", e);
+        }
+
         // Clear the invite token from session so it can't be reused inadvertently
         req.session.inviteToken = null;
 
@@ -870,6 +882,18 @@ app.post("/api/invite/accept", (req, res) => {
 
   // mark invite accepted
   Invites.markAccepted({ token, userId: me.id, acceptedAt: nowIso() });
+
+  // Second safety: immediately connect inviter & accepted user (idempotent)
+  try {
+    const inviterId = (invite && (invite.inviter_id ?? invite.inviterId)) || null;
+    if (inviterId) {
+      connectBothWays(inviterId, Number(me.id), nowIso());
+    } else {
+      console.warn("Invite accept: missing inviter_id for token", token);
+    }
+  } catch (e) {
+    console.error("auto-connect on invite accept failed:", e);
+  }
 
   return res.json({ ok: true });
 });
