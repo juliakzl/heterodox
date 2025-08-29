@@ -945,6 +945,22 @@ try {
   console.warn("Could not ensure connections unique index:", e && e.message ? e.message : e);
 }
 
+
+// Run the idempotent backfill periodically (e.g. every 5 minutes)
+const BACKFILL_INTERVAL_MS = parseInt(process.env.CONNECTIONS_BACKFILL_EVERY_MS || '300000', 10);
+
+let backfillRunning = false;
+setInterval(() => {
+  if (backfillRunning) return;
+  backfillRunning = true;
+  try {
+    backfillConnectionsFromInvites(); // INSERT OR IGNORE -> safe upsert
+  } catch (e) {
+    console.error("Periodic connections backfill failed:", e);
+  } finally {
+    backfillRunning = false;
+  }
+}, BACKFILL_INTERVAL_MS);
 // On boot: rebuild any missing connections from accepted invites (no deletes)
 backfillConnectionsFromInvites();
 
