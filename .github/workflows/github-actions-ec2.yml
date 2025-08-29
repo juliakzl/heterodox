@@ -27,6 +27,10 @@ jobs:
 
       - name: Build client
         working-directory: client
+        env:
+          # Optional: avoid registry flakiness
+          NPM_CONFIG_AUDIT: "false"
+          NPM_CONFIG_FUND: "false"
         run: |
           set -euo pipefail
           npm ci
@@ -61,7 +65,6 @@ jobs:
           SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
           REMOTE_HOST:      ec2-18-199-237-58.eu-central-1.compute.amazonaws.com
           REMOTE_USER:      ubuntu
-          # Prevent secrets/DB clobber; keep node_modules deleted remotely
           ARGS: >-
             -avzr --delete
             --exclude='.git'
@@ -81,12 +84,34 @@ jobs:
             set -euo pipefail
             if [ "${{ vars.DEPLOY_SERVER }}" = "true" ]; then
               cd /home/ubuntu/heterodox/server
-              npm ci --omit=dev
-              # restart the correct systemd unit name
+              NODE_ENV=production npm ci --omit=dev --no-audit --no-fund
+
+              # Restart backend
               sudo systemctl restart heterodox
-              # local health check of upstream
-              curl -fsSI http://127.0.0.1:4000/ >/dev/null
+
+              # Wait up to 60s for :4000 to be listening and responsive
+              ok=0
+              for i in {1..60}; do
+                if sudo ss -ltnp | grep -q ':4000'; then
+                  code=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 http://127.0.0.1:4000/ || true)
+                  # Accept 200/301/302/401 as "up" (401 expected without session)
+                  if [[ "$code" =~ ^(200|30[12]|401)$ ]]; then
+                    echo "Backend healthy (HTTP $code)"
+                    ok=1
+                    break
+                  fi
+                fi
+                sleep 1
+              done
+
+              if [ "$ok" -ne 1 ]; then
+                echo "Backend did not become healthy. Recent logs:"
+                sudo systemctl status heterodox --no-pager || true
+                sudo journalctl -u heterodox -n 200 --no-pager || true
+                exit 1
+              fi
             fi
+
             # Reload Caddy (harmless if unchanged)
             sudo systemctl reload caddy || true
             echo "${{ github.sha }}" | sudo tee /home/ubuntu/heterodox/.deployed_sha >/dev/null
