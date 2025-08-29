@@ -13,8 +13,14 @@ export default function App() {
   const [me, setMe] = useState(null);
   const [tab, setTab] = useState("Main");
 
-  const inviteToken =
-    new URLSearchParams(window.location.search).get("invite") || null;
+  const inviteToken = (() => {
+    // 1) query string ?invite=TOKEN
+    const qs = new URLSearchParams(window.location.search).get("invite");
+    if (qs) return qs;
+    // 2) pretty path /invite/TOKEN
+    const m = window.location.pathname.match(/^\/invite\/([^/?#]+)/);
+    return m ? decodeURIComponent(m[1]) : null;
+  })();
 
   // After login, finalize any pending invite we stashed before auth.
   const finishPendingInvite = async () => {

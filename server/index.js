@@ -764,7 +764,6 @@ app.post("/api/invite/accept", (req, res) => {
   return res.json({ ok: true });
 });
 
-// temporary debug route – remove later
 app.post("/api/invite/create", (req, res) => {
   // Require a signed-in user; trust the server-side session for inviter identity
   const me = requireUser(req, res);

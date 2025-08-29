@@ -51,15 +51,18 @@ export function InviteModal({ onClose = () => {}, onInvited = () => {} }) {
         method: "POST",
         body: JSON.stringify(payload),
       });
-      // Accept multiple possible response shapes; fall back to building the Google OAuth invite link
+      // Accept multiple possible response shapes; ALWAYS share the WelcomeInvite page URL
       const token = j.token || j.inviteToken || "";
-      let inviteUrl = j.invite_url || j.url || "";
-      if (!inviteUrl && token) {
-        const shareOrigin =
-          (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.DEV)
-            ? "http://localhost:4000"
-            : (typeof window !== "undefined" ? window.location.origin : "");
-        inviteUrl = `${shareOrigin}/api/auth/google?invite=${encodeURIComponent(token)}`;
+      // Default to building an /invite/:token link on the current origin (works in dev/prod)
+      let inviteUrl = "";
+      if (token) {
+        const shareOrigin = (typeof window !== "undefined" ? window.location.origin : "");
+        inviteUrl = `${shareOrigin}/invite/${encodeURIComponent(token)}`;
+      }
+      // If backend already returned a proper /invite link, prefer it
+      const serverUrl = j.invite_url || j.url || "";
+      if (serverUrl && String(serverUrl).includes("/invite/")) {
+        inviteUrl = String(serverUrl);
       }
       setResult({ inviteUrl, token });
       onInvited({ ...j, inviteUrl, token });
