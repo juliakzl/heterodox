@@ -158,6 +158,60 @@ function getWeeklyQuestionRow(weekStartStr) {
     .get(weekStartStr);
 }
 
+// ---------- Connection helpers & backfill ----------
+function upsertConnectionOneWay(userId, peerId, ts) {
+  try {
+    db.prepare(
+      "INSERT OR IGNORE INTO connections (user_id, peer_id, created_at) VALUES (?, ?, ?)"
+    ).run(userId, peerId, ts || nowIso());
+    return true;
+  } catch (e) {
+    console.error("upsertConnectionOneWay error:", e);
+    return false;
+  }
+}
+
+function connectBothWays(aId, bId, ts) {
+  const a = Number(aId), b = Number(bId);
+  if (!a || !b || a === b) return false;
+  const r1 = upsertConnectionOneWay(a, b, ts);
+  const r2 = upsertConnectionOneWay(b, a, ts);
+  return r1 || r2;
+}
+
+// Build missing connections from accepted invites (idempotent; no deletes)
+function backfillConnectionsFromInvites() {
+  const rows = db.prepare(`
+    SELECT
+      i.inviter_id        AS inviterId,
+      i.accepted_by_user_id AS newUserId
+    FROM invites i
+    WHERE i.inviter_id IS NOT NULL
+      AND i.accepted_by_user_id IS NOT NULL
+  `).all();
+
+  const ts = nowIso();
+  let created = 0;
+
+  const tx = db.transaction(() => {
+    for (const r of rows) {
+      if (!r.inviterId || !r.newUserId || r.inviterId === r.newUserId) continue;
+
+      const a = db.prepare(
+        "INSERT OR IGNORE INTO connections (user_id, peer_id, created_at) VALUES (?, ?, ?)"
+      ).run(r.inviterId, r.newUserId, ts);
+      const b = db.prepare(
+        "INSERT OR IGNORE INTO connections (user_id, peer_id, created_at) VALUES (?, ?, ?)"
+      ).run(r.newUserId, r.inviterId, ts);
+
+      created += (a.changes || 0) + (b.changes || 0);
+    }
+  });
+  tx();
+
+  console.log(`Connections backfill: invites processed=${rows.length}, edges created=${created}`);
+}
+
 // ---------- Passport (Google OAuth 2.0) ----------
 passport.serializeUser((user, done) =>
   done(null, { id: user.id, displayName: user.display_name })
@@ -337,23 +391,32 @@ app.post("/api/login", (req, res) => {
 app.post("/api/connections/add", (req, res) => {
   const me = requireUser(req, res);
   if (!me) return;
-  const { peerDisplayName } = req.body;
-  const peer = db
-    .prepare("SELECT id FROM users WHERE display_name = ?")
-    .get(peerDisplayName);
+  const { peerId, peerDisplayName } = req.body || {};
+
+  let peer = null;
+  if (peerId) {
+    peer = db.prepare("SELECT id FROM users WHERE id = ?").get(Number(peerId));
+  } else if (peerDisplayName) {
+    peer = db.prepare("SELECT id FROM users WHERE display_name = ?").get(peerDisplayName);
+  }
+
   if (!peer) return res.status(404).json({ error: "peer_not_found" });
-  if (peer.id === me.id)
-    return res.status(400).json({ error: "cannot_connect_to_self" });
+  if (peer.id === me.id) return res.status(400).json({ error: "cannot_connect_to_self" });
+
+  const ts = nowIso();
   try {
-    db.prepare(
-      "INSERT INTO connections (user_id, peer_id, created_at) VALUES (?, ?, ?)"
-    ).run(me.id, peer.id, nowIso());
-    res.json({ ok: true });
+    const a = db.prepare(
+      "INSERT OR IGNORE INTO connections (user_id, peer_id, created_at) VALUES (?, ?, ?)"
+    ).run(me.id, peer.id, ts);
+    const b = db.prepare(
+      "INSERT OR IGNORE INTO connections (user_id, peer_id, created_at) VALUES (?, ?, ?)"
+    ).run(peer.id, me.id, ts);
+
+    const created = (a.changes || 0) + (b.changes || 0);
+    return res.json({ ok: true, created });
   } catch (e) {
-    if (String(e).includes("UNIQUE"))
-      return res.status(409).json({ error: "already_connected" });
     console.error(e);
-    res.status(500).json({ error: "server_error" });
+    return res.status(500).json({ error: "server_error" });
   }
 });
 
@@ -372,6 +435,19 @@ app.get("/api/connections", (req, res) => {
     )
     .all(me.id);
   res.json({ connections: rows });
+});
+
+// Admin: on-demand backfill (idempotent)
+app.post("/api/admin/connections/backfill", (req, res) => {
+  const me = requireUser(req, res);
+  if (!me) return;
+  try {
+    backfillConnectionsFromInvites();
+    res.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "server_error" });
+  }
 });
 
 // ---------- Questions ----------
@@ -803,6 +879,16 @@ app.get("/api/users/search", (req, res) => {
 });
 
 const PORT = process.env.PORT || 4000;
+
+// Ensure uniqueness so upserts don't duplicate
+try {
+  db.prepare("CREATE UNIQUE INDEX IF NOT EXISTS idx_connections_unique ON connections (user_id, peer_id)").run();
+} catch (e) {
+  console.warn("Could not ensure connections unique index:", e && e.message ? e.message : e);
+}
+
+// On boot: rebuild any missing connections from accepted invites (no deletes)
+backfillConnectionsFromInvites();
 
 // app.get('/', (req, res) => {
 //   const expected = (process.env.BASE_URL || '').trim().replace(/\/+$/, '');
