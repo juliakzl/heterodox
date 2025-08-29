@@ -437,6 +437,40 @@ app.get("/api/connections", (req, res) => {
   res.json({ connections: rows });
 });
 
+// Second-degree connections (friends-of-friends), excluding self and existing direct connections
+// GET /api/connections/second?limit=50
+app.get("/api/connections/second", (req, res) => {
+  const me = requireUser(req, res);
+  if (!me) return;
+  const limit = Math.min(Math.max(parseInt(String(req.query.limit || "50"), 10) || 50, 1), 200);
+
+  try {
+    const rows = db
+      .prepare(
+        `
+        SELECT DISTINCT u.id, u.display_name
+        FROM connections c1
+        JOIN connections c2 ON c1.peer_id = c2.user_id
+        JOIN users u ON u.id = c2.peer_id
+        LEFT JOIN connections d
+               ON d.user_id = c1.user_id
+              AND d.peer_id = u.id
+        WHERE c1.user_id = ?
+          AND u.id != ?
+          AND d.user_id IS NULL
+        ORDER BY u.display_name ASC
+        LIMIT ?
+      `
+      )
+      .all(me.id, me.id, limit);
+
+    res.json({ users: rows, count: rows.length });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "server_error" });
+  }
+});
+
 // Admin: on-demand backfill (idempotent)
 app.post("/api/admin/connections/backfill", (req, res) => {
   const me = requireUser(req, res);
