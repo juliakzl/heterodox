@@ -21,7 +21,8 @@ jobs:
       REMOTE_DATA_DIR: /home/ubuntu/heterodox/data
       REMOTE_BACKUP_DIR: /home/ubuntu/heterodox/backups
       REMOTE_SERVICE: heterodox
-      REMOTE_PORT: "4000"
+      SSH_PORT: "22"         # <-- SSH port for rsync/ssh
+      API_PORT: "4000"       # <-- your Node app port (do NOT name this REMOTE_PORT)
 
     steps:
       - name: Checkout
@@ -58,12 +59,13 @@ jobs:
             mkdir -p "$REMOTE_DATA_DIR"
             mkdir -p "$REMOTE_BACKUP_DIR"
 
-      - name: Deploy client build
+      - name: Deploy client build (rsync over SSH:22)
         uses: easingthemes/ssh-deploy@v5.1.0
         env:
           SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
           REMOTE_HOST:      ${{ env.REMOTE_HOST }}
           REMOTE_USER:      ${{ env.REMOTE_USER }}
+          REMOTE_PORT:      ${{ env.SSH_PORT }}    # <-- force SSH port 22
           ARGS:             "-avzr --delete"
           SOURCE:           "client/dist/"
           TARGET:           "${{ env.REMOTE_ROOT }}/client/dist"
@@ -76,6 +78,7 @@ jobs:
           SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
           REMOTE_HOST:      ${{ env.REMOTE_HOST }}
           REMOTE_USER:      ${{ env.REMOTE_USER }}
+          REMOTE_PORT:      ${{ env.SSH_PORT }}    # <-- force SSH port 22
           # Protect secrets/DB on VM; we WANT migrations/ to ship
           ARGS: >-
             -avzr --delete
@@ -93,7 +96,7 @@ jobs:
           host:     ${{ env.REMOTE_HOST }}
           username: ${{ env.REMOTE_USER }}
           key:      ${{ secrets.EC2_SSH_KEY }}
-          envs: REMOTE_ROOT,REMOTE_DATA_DIR,REMOTE_BACKUP_DIR,REMOTE_SERVICE,REMOTE_PORT
+          envs: REMOTE_ROOT,REMOTE_DATA_DIR,REMOTE_BACKUP_DIR,REMOTE_SERVICE,API_PORT
           script: |
             set -euo pipefail
 
@@ -115,10 +118,10 @@ jobs:
 
               sudo systemctl restart "$REMOTE_SERVICE"
 
-              # Wait up to 60s for :$REMOTE_PORT to be healthy
+              # Wait up to 60s for API to be healthy on API_PORT
               for i in $(seq 1 60); do
-                if sudo ss -ltnp | grep -q ":${REMOTE_PORT}"; then
-                  code=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 "http://127.0.0.1:${REMOTE_PORT}/" || true)
+                if sudo ss -ltnp | grep -q ":${API_PORT}"; then
+                  code=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 "http://127.0.0.1:${API_PORT}/" || true)
                   # Accept 200/301/302/401 as "up"
                   if echo "$code" | grep -Eq '^(200|30[12]|401)$'; then
                     echo "Backend healthy (HTTP $code)"
@@ -138,9 +141,6 @@ jobs:
               DB_PATH="$DB_PATH" node server/migrate.js --status || true
             fi
 
-            # Reload Caddy (harmless if config unchanged)
             sudo systemctl reload caddy || true
-
-            # Stamp deployment info
             echo "${{ github.sha }}" | sudo tee "${REMOTE_ROOT}/.deployed_sha" >/dev/null
             date -u | sudo tee "${REMOTE_ROOT}/.deployed_at" >/dev/null
