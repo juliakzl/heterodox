@@ -50,11 +50,11 @@ jobs:
           host:     ${{ env.REMOTE_HOST }}
           username: ${{ env.REMOTE_USER }}
           key:      ${{ secrets.EC2_SSH_KEY }}
+          envs: REMOTE_ROOT,REMOTE_DATA_DIR,REMOTE_BACKUP_DIR
           script: |
             set -euo pipefail
             mkdir -p "$REMOTE_ROOT/client/dist"
             mkdir -p "$REMOTE_ROOT/server"
-            # Keep DB/file backups OUTSIDE rsync target
             mkdir -p "$REMOTE_DATA_DIR"
             mkdir -p "$REMOTE_BACKUP_DIR"
 
@@ -93,15 +93,14 @@ jobs:
           host:     ${{ env.REMOTE_HOST }}
           username: ${{ env.REMOTE_USER }}
           key:      ${{ secrets.EC2_SSH_KEY }}
+          envs: REMOTE_ROOT,REMOTE_DATA_DIR,REMOTE_BACKUP_DIR,REMOTE_SERVICE,REMOTE_PORT
           script: |
             set -euo pipefail
 
-            # If deploying the backend, install deps, run migrations, restart, health check
             if [ "${{ vars.DEPLOY_SERVER }}" = "true" ]; then
               cd "$REMOTE_ROOT/server"
               NODE_ENV=production npm ci --omit=dev --no-audit --no-fund
 
-              # Ensure DB path and back up if it exists
               export DB_PATH="${REMOTE_DATA_DIR}/asa.db"
               mkdir -p "${REMOTE_DATA_DIR}" "${REMOTE_BACKUP_DIR}"
               if [ -f "$DB_PATH" ]; then
@@ -110,19 +109,17 @@ jobs:
                 echo "Backed up DB to ${REMOTE_BACKUP_DIR}/asa.db.${ts}.sqlite"
               fi
 
-              # Run migrations (status for logs, then apply)
               echo "=== Migration status (before) ==="
               DB_PATH="$DB_PATH" node server/migrate.js --status || true
               DB_PATH="$DB_PATH" node server/migrate.js
 
-              # Restart service cleanly
-              sudo systemctl restart "${REMOTE_SERVICE}"
+              sudo systemctl restart "$REMOTE_SERVICE"
 
-              # Wait up to 60s for :${REMOTE_PORT} to be healthy
+              # Wait up to 60s for :$REMOTE_PORT to be healthy
               for i in $(seq 1 60); do
                 if sudo ss -ltnp | grep -q ":${REMOTE_PORT}"; then
                   code=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 "http://127.0.0.1:${REMOTE_PORT}/" || true)
-                  # 200/301/302/401 are acceptable (401 if no session)
+                  # Accept 200/301/302/401 as "up"
                   if echo "$code" | grep -Eq '^(200|30[12]|401)$'; then
                     echo "Backend healthy (HTTP $code)"
                     break
@@ -130,8 +127,8 @@ jobs:
                 fi
                 if [ "$i" -eq 60 ]; then
                   echo "Backend did not become healthy. Recent logs:"
-                  sudo systemctl status "${REMOTE_SERVICE}" --no-pager || true
-                  sudo journalctl -u "${REMOTE_SERVICE}" -n 200 --no-pager || true
+                  sudo systemctl status "$REMOTE_SERVICE" --no-pager || true
+                  sudo journalctl -u "$REMOTE_SERVICE" -n 200 --no-pager || true
                   exit 1
                 fi
                 sleep 1
