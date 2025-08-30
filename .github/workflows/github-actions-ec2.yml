@@ -104,18 +104,31 @@ jobs:
               cd "$REMOTE_ROOT/server"
               NODE_ENV=production npm ci --omit=dev --no-audit --no-fund
 
+              # Use a dedicated data dir for the DB
               export DB_PATH="${REMOTE_DATA_DIR}/asa.db"
               mkdir -p "${REMOTE_DATA_DIR}" "${REMOTE_BACKUP_DIR}"
+
+              # If an old DB exists under server/, move it once to data/
+              if [ -f "$REMOTE_ROOT/server/asa.db" ] && [ ! -f "$DB_PATH" ]; then
+                echo "Found legacy DB at server/asa.db. Moving to data/..."
+                mv "$REMOTE_ROOT/server/asa.db" "$DB_PATH"
+              fi
+
+              # Backup if present
               if [ -f "$DB_PATH" ]; then
                 ts=$(date -u +%Y%m%d_%H%M%S)
                 cp -a "$DB_PATH" "${REMOTE_BACKUP_DIR}/asa.db.${ts}.sqlite"
                 echo "Backed up DB to ${REMOTE_BACKUP_DIR}/asa.db.${ts}.sqlite"
               fi
 
-              echo "=== Migration status (before) ==="
-              DB_PATH="$DB_PATH" node ./migrate.js --status || true
+              echo "=== Sanity: which migrate.js do we have? ==="
+              ls -l "$REMOTE_ROOT/server/migrate.js" || true
+              head -n 5 "$REMOTE_ROOT/server/migrate.js" || true
 
-              DB_PATH="$DB_PATH" node ./migrate.js
+              echo "=== Migration status (before) ==="
+              env DB_PATH="$DB_PATH" MIGRATIONS_DIR="$REMOTE_ROOT/server/migrations" node ./migrate.js --status || true
+
+              env DB_PATH="$DB_PATH" MIGRATIONS_DIR="$REMOTE_ROOT/server/migrations" node ./migrate.js
 
               sudo systemctl restart "$REMOTE_SERVICE"
 
@@ -138,12 +151,8 @@ jobs:
               done
 
               echo "=== Migration status (after) ==="
-              DB_PATH="$DB_PATH" node ./migrate.js --status || true
+              env DB_PATH="$DB_PATH" MIGRATIONS_DIR="$REMOTE_ROOT/server/migrations" node ./migrate.js --status || true
             fi
-
-            sudo systemctl reload caddy || true
-            echo "${{ github.sha }}" | sudo tee "${REMOTE_ROOT}/.deployed_sha" >/dev/null
-            date -u | sudo tee "${REMOTE_ROOT}/.deployed_at" >/dev/null
 
             sudo systemctl reload caddy || true
             echo "${{ github.sha }}" | sudo tee "${REMOTE_ROOT}/.deployed_sha" >/dev/null
