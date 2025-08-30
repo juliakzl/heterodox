@@ -113,8 +113,9 @@ jobs:
               fi
 
               echo "=== Migration status (before) ==="
-              DB_PATH="$DB_PATH" node server/migrate.js --status || true
-              DB_PATH="$DB_PATH" node server/migrate.js
+              DB_PATH="$DB_PATH" node ./migrate.js --status || true
+
+              DB_PATH="$DB_PATH" node ./migrate.js
 
               sudo systemctl restart "$REMOTE_SERVICE"
 
@@ -122,7 +123,6 @@ jobs:
               for i in $(seq 1 60); do
                 if sudo ss -ltnp | grep -q ":${API_PORT}"; then
                   code=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 "http://127.0.0.1:${API_PORT}/" || true)
-                  # Accept 200/301/302/401 as "up"
                   if echo "$code" | grep -Eq '^(200|30[12]|401)$'; then
                     echo "Backend healthy (HTTP $code)"
                     break
@@ -138,8 +138,12 @@ jobs:
               done
 
               echo "=== Migration status (after) ==="
-              DB_PATH="$DB_PATH" node server/migrate.js --status || true
+              DB_PATH="$DB_PATH" node ./migrate.js --status || true
             fi
+
+            sudo systemctl reload caddy || true
+            echo "${{ github.sha }}" | sudo tee "${REMOTE_ROOT}/.deployed_sha" >/dev/null
+            date -u | sudo tee "${REMOTE_ROOT}/.deployed_at" >/dev/null
 
             sudo systemctl reload caddy || true
             echo "${{ github.sha }}" | sudo tee "${REMOTE_ROOT}/.deployed_sha" >/dev/null
