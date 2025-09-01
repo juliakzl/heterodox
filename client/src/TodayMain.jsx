@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import dayjs from "dayjs";
+import VoiceRecorder from "./VoiceRecorder.jsx";
 
 // Minimal API helper: uses credentials for session cookie; works in dev & prod
 const API_BASE = import.meta.env.DEV ? "http://localhost:4000" : "";
@@ -21,6 +22,31 @@ export default function TodayMain({ setTab }) {
   const [loading, setLoading] = useState(true);
   const [weekly, setWeekly] = useState(null); // payload from /api/weekly
   const [error, setError] = useState(null);
+
+  const [answer, setAnswer] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    const text = answer.trim();
+    if (!text) return;
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      await api("/api/answers", {
+        method: "POST",
+        body: JSON.stringify({ text }),
+      });
+      setAnswer("");
+      // Refresh thread so the new answer appears
+      await fetchWeekly();
+    } catch (err) {
+      setSubmitError(err.message || "Failed to submit answer.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   const fetchWeekly = async () => {
     setLoading(true);
@@ -82,6 +108,39 @@ export default function TodayMain({ setTab }) {
         Week starting {weekly.week_start}
       </div>
       <p style={{ marginTop: 8, marginBottom: 12 }}>{q.text}</p>
+
+      {/* Answer composer */}
+      <form onSubmit={handleSubmit} style={{ marginTop: 12 }}>
+        <label htmlFor="answerBox" className="muted">Your answer</label>
+        <textarea
+          id="answerBox"
+          rows={4}
+          value={answer}
+          onChange={(e) => setAnswer(e.target.value)}
+          placeholder="Share your perspective…"
+          style={{ display: "block", width: "100%", marginTop: 6 }}
+        />
+        {submitError && (
+          <div className="muted" style={{ color: "crimson", marginTop: 6 }}>
+            {submitError}
+          </div>
+        )}
+        <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <button type="submit" disabled={submitting || !answer.trim()}>
+            {submitting ? "Submitting…" : "Submit answer"}
+          </button>
+          <button type="button" onClick={() => setAnswer("")} disabled={submitting || !answer}>
+            Clear
+          </button>
+          <VoiceRecorder
+            onText={(t) =>
+              setAnswer((prev) => (prev ? `${prev}${prev.endsWith(" ") ? "" : " "}${t}` : t))
+            }
+            disabled={submitting}
+            uploadUrl={`${API_BASE}/api/answers/voice`}
+          />
+        </div>
+      </form>
 
       {/* Answers thread */}
       <div>

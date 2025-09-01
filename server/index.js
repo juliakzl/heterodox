@@ -4,6 +4,7 @@ import dayjs from "dayjs";
 import "dotenv/config";
 import session from "express-session";
 import passport from "passport";
+import multer from "multer";
 
 import path from "path";
 import { fileURLToPath } from "url";
@@ -12,8 +13,10 @@ import fs from "fs";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import * as Invites from "./invites.js";
 import * as Signup from "./signup.js";
+import voiceRouter from './voice.js';
 
 const app = express();
+const upload = multer({ limits: { fileSize: 25 * 1024 * 1024 } });
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -54,6 +57,8 @@ app.use(
     },
   })
 );
+
+app.use(voiceRouter);
 
 import db from "./db.js";
 
@@ -156,6 +161,57 @@ function getWeeklyQuestionRow(weekStartStr) {
   `
     )
     .get(weekStartStr);
+}
+
+// ---------- Weekly auto-publish (scheduler) ----------
+function selectOldestUnusedQuestion() {
+  return db.prepare(`
+    SELECT q.id, q.user_id, q.created_at
+    FROM questions q
+    WHERE q.asked_at IS NULL
+      AND NOT EXISTS (SELECT 1 FROM weekly_rounds w WHERE w.question_id = q.id)
+    ORDER BY q.created_at ASC, q.id ASC
+    LIMIT 1
+  `).get();
+}
+
+function publishOldestForWeek(weekStartStr) {
+  const wk = String(weekStartStr).slice(0, 10);
+  // Do not overwrite an existing weekly entry
+  const exists = db.prepare('SELECT 1 FROM weekly_rounds WHERE week_start = ?').get(wk);
+  if (exists) return false;
+
+  const q = selectOldestUnusedQuestion();
+  if (!q) {
+    console.warn(`Weekly publish: no unused questions available for week ${wk}`);
+    return false;
+  }
+
+  // Publish atomically and mark as used to avoid re-picking
+  const tx = db.transaction(() => {
+    db.prepare(`
+      INSERT INTO weekly_rounds (week_start, question_id, published_at)
+      VALUES (?, ?, ?)
+    `).run(wk, q.id, nowIso());
+
+    db.prepare(`
+      UPDATE questions SET asked_at = ? WHERE id = ? AND asked_at IS NULL
+    `).run(nowIso(), q.id);
+  });
+  tx();
+
+  console.log(`Weekly publish: week=${wk} question_id=${q.id}`);
+  return true;
+}
+
+function ensureCurrentWeekPublished() {
+  const wk = weekStartMonday();
+  try {
+    return publishOldestForWeek(wk);
+  } catch (e) {
+    console.error('ensureCurrentWeekPublished failed:', e);
+    return false;
+  }
 }
 
 // ---------- Connection helpers & backfill ----------
@@ -964,6 +1020,15 @@ try {
   console.warn("Could not ensure connections unique index:", e && e.message ? e.message : e);
 }
 
+
+// Kick off weekly auto-publish on boot and poll periodically (idempotent)
+const WEEKLY_PUBLISH_CHECK_EVERY_MS = parseInt(process.env.WEEKLY_PUBLISH_CHECK_EVERY_MS || '300000', 10); // default 5 min
+if (process.env.WEEKLY_PUBLISH_DISABLED !== '1') {
+  // Ensure current week has a published question right away
+  ensureCurrentWeekPublished();
+  // Then keep checking; when a new Monday arrives this will insert for the new week
+  setInterval(ensureCurrentWeekPublished, WEEKLY_PUBLISH_CHECK_EVERY_MS);
+}
 
 // Run the idempotent backfill periodically (e.g. every 5 minutes)
 const BACKFILL_INTERVAL_MS = parseInt(process.env.CONNECTIONS_BACKFILL_EVERY_MS || '300000', 10);
