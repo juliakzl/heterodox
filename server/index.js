@@ -871,6 +871,25 @@ app.post("/api/invite/accept", (req, res) => {
     return res.status(409).json({ error: "invite_already_used" });
   }
 
+  // Optionally persist profile fields captured during onboarding
+  const firstName = (req.body?.firstName || "").trim();
+  const lastName  = (req.body?.lastName  || "").trim();
+  const city      = (req.body?.city      || "").trim();
+
+  if (firstName || lastName || city) {
+    const sets = [];
+    const vals = [];
+    if (firstName) { sets.push("first_name = ?"); vals.push(firstName); }
+    if (lastName)  { sets.push("last_name = ?");  vals.push(lastName);  }
+    if (city)      { sets.push("city = ?");       vals.push(city);      }
+    try {
+      db.prepare(`UPDATE users SET ${sets.join(", ")} WHERE id = ?`).run(...vals, me.id);
+    } catch (e) {
+      // If a column is missing (e.g., city), this will log but won't block the flow.
+      console.error("Failed to update user profile fields on invite accept:", e);
+    }
+  }
+
   // persist onboarding answer
   Signup.saveOnboardingAnswer({
     userId: me.id,

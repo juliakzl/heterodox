@@ -3,7 +3,9 @@ PRAGMA foreign_keys = ON;
 -- ===== users =====
 CREATE TABLE IF NOT EXISTS users (
   id             INTEGER PRIMARY KEY AUTOINCREMENT,
-  display_name   TEXT,                           -- optional; not necessarily unique
+  display_name   TEXT,
+  first_name     TEXT,
+  last_name     TEXT,                           
   email          TEXT,                           -- may be NULL
   email_verified INTEGER NOT NULL DEFAULT 0,     -- 0/1 boolean
   photo_url      TEXT,
