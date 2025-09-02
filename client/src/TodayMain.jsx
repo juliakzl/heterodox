@@ -86,6 +86,14 @@ export default function TodayMain({ setTab }) {
   }
 
   const q = weekly?.question || null;
+  const askerName =
+    (q && (q.asker_name || q.author_name || q.display_name || q.user_display_name)) ||
+    weekly?.question_author?.display_name ||
+    weekly?.asker_display_name ||
+    weekly?.asker_name ||
+    weekly?.author_name ||
+    null;
+  const weekLabel = weekly?.week_start ? dayjs(weekly.week_start).format("MMMM, D") : null;
 
   if (!q) {
     return (
@@ -105,9 +113,14 @@ export default function TodayMain({ setTab }) {
     <div className="card">
       <h3 style={{ margin: 0 }}>This Week’s Question</h3>
       <div className="pill" style={{ marginTop: 8 }}>
-        Week starting {weekly.week_start}
+        Week starting {weekLabel || weekly.week_start}
       </div>
       <p style={{ marginTop: 8, marginBottom: 12 }}>{q.text}</p>
+      {askerName && (
+        <div className="muted" style={{ marginTop: 4 }}>
+          Asked by {askerName}
+        </div>
+      )}
 
       {/* Answer composer */}
       <form onSubmit={handleSubmit} style={{ marginTop: 12 }}>

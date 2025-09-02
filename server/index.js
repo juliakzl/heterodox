@@ -615,7 +615,13 @@ app.get("/api/weekly", (req, res) => {
     const payload = {
       week_start: wkStart,
       phase,
-      question: { id: q.id, text: q.text, owner_name: q.owner_name },
+      question: {
+        id: q.id,
+        text: q.text,
+        owner_id: q.user_id,
+        owner_name: q.owner_name,
+        author_name: q.owner_name
+      },
       iAnswered: !!answered,
       can_submit: phase === "answering",
       can_read_answers: phase === "reveal",

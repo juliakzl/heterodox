@@ -2,6 +2,19 @@ import { useEffect, useState } from 'react';
 import { api } from './api';
 import dayjs from 'dayjs';
 
+// Robust, cross-browser formatter with graceful fallback
+function formatWeek(dateStr) {
+  if (!dateStr) return '—';
+  const d = dayjs(dateStr);
+  if (d.isValid()) return d.format('MMMM, D');
+  // Fallback for odd strings or old cached bundles
+  const native = new Date(dateStr);
+  if (!Number.isNaN(native.getTime())) {
+    return native.toLocaleDateString(undefined, { month: 'long', day: 'numeric' });
+  }
+  return String(dateStr);
+}
+
 const Arrow = ({ open, disabled }) => (
   <svg
     width="14"
@@ -112,16 +125,27 @@ export default function WeeklyFeed(){
           const ans = answersByWeek[w.week_start] || [];
           const isLoading = !!loadingAns[w.week_start];
           const ansErr = errorAns[w.week_start];
+          const askerName =
+            w?.question?.asked_by_name ??
+            w?.question?.asked_by_display_name ??
+            w?.question?.asker_name ??
+            w?.question?.user_display_name ??
+            null;
 
           return (
             <div key={w.week_start} className="answer">
               {/* 1) Week pill */}
-              <div className="pill">Week starting {w.week_start}</div>
+              <div className="pill">Week starting {formatWeek(w.week_start)}</div>
 
               {/* 2) Question text */}
               <div style={{marginTop:6, marginBottom:6}}>
                 {w?.question?.text || <span className="muted">No question recorded</span>}
               </div>
+              {askerName && (
+                <div className="muted" style={{ marginTop: 0, marginBottom: 6, fontSize: 12 }}>
+                  Asked by {askerName}
+                </div>
+              )}
 
               {/* 3) Answers count pill (optional) */}
               {typeof w.answers_count === 'number' && (
