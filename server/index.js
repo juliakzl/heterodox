@@ -14,6 +14,7 @@ import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import * as Invites from "./invites.js";
 import * as Signup from "./signup.js";
 import voiceRouter from './voice.js';
+import { generateWeeklyAIQuestion } from "./ai.js";
 
 const app = express();
 const upload = multer({ limits: { fileSize: 25 * 1024 * 1024 } });
@@ -123,6 +124,9 @@ function currentWeeklyPhase(weekStartStr, now = dayjs()) {
   return "reveal";
 }
 
+// User ID used to attribute AI-generated weekly questions
+const AI_QUESTION_USER_ID = parseInt(process.env.AI_QUESTION_USER_ID || "1", 10);
+
 // Resolve public base URL: prefer env; in prod fall back to forwarded proto/host; dev => localhost:5173
 function baseUrlFromReq(req) {
   const env = (process.env.BASE_URL || "").trim();
@@ -179,7 +183,8 @@ function publishOldestForWeek(weekStartStr) {
   const wk = String(weekStartStr).slice(0, 10);
   // Do not overwrite an existing weekly entry
   const exists = db.prepare('SELECT 1 FROM weekly_rounds WHERE week_start = ?').get(wk);
-  if (exists) return false;
+  // Already published for this week — treat as success (idempotent)
+  if (exists) return true;
 
   const q = selectOldestUnusedQuestion();
   if (!q) {
@@ -204,12 +209,48 @@ function publishOldestForWeek(weekStartStr) {
   return true;
 }
 
-function ensureCurrentWeekPublished() {
+async function ensureCurrentWeekPublished() {
   const wk = weekStartMonday();
   try {
+    // 1) Try to publish the oldest human-submitted question
+    if (publishOldestForWeek(wk)) return true;
+
+    // 2) None available — generate one with AI and publish it
+    let text = null;
+    try {
+      text = await generateWeeklyAIQuestion();
+    } catch (e) {
+      console.error("AI question generation failed:", e);
+      text = null;
+    }
+    if (!text || typeof text !== "string" || text.trim().length < 5) {
+      console.warn("AI generation returned no usable question, skipping publish for week", wk);
+      return false;
+    }
+
+    // Only insert an AI question if there are no other unused ones.
+    // Guard against duplicate inserts for the same (AI user, qdate).
+    const existingAI = db.prepare(`
+      SELECT id FROM questions
+      WHERE user_id = ? AND qdate = ? AND asked_at IS NULL
+    `).get(AI_QUESTION_USER_ID, today());
+
+    let insertedId = existingAI?.id || null;
+    if (!insertedId) {
+      const insert = db.prepare(`
+        INSERT INTO questions (user_id, qdate, text, created_at)
+        VALUES (?, ?, ?, ?)
+      `).run(AI_QUESTION_USER_ID, today(), text.trim(), nowIso());
+      insertedId = insert.lastInsertRowid;
+      console.log(`Inserted AI weekly question id=${insertedId} for week=${wk}`);
+    } else {
+      console.log(`Reusing existing AI question id=${insertedId} for today`);
+    }
+
+    // Publish (will no-op if already published)
     return publishOldestForWeek(wk);
   } catch (e) {
-    console.error('ensureCurrentWeekPublished failed:', e);
+    console.error("ensureCurrentWeekPublished failed:", e);
     return false;
   }
 }
@@ -1030,10 +1071,10 @@ try {
 // Kick off weekly auto-publish on boot and poll periodically (idempotent)
 const WEEKLY_PUBLISH_CHECK_EVERY_MS = parseInt(process.env.WEEKLY_PUBLISH_CHECK_EVERY_MS || '300000', 10); // default 5 min
 if (process.env.WEEKLY_PUBLISH_DISABLED !== '1') {
-  // Ensure current week has a published question right away
-  ensureCurrentWeekPublished();
+  // Ensure current week has a published question right away (fire-and-forget)
+  ensureCurrentWeekPublished().catch(() => {});
   // Then keep checking; when a new Monday arrives this will insert for the new week
-  setInterval(ensureCurrentWeekPublished, WEEKLY_PUBLISH_CHECK_EVERY_MS);
+  setInterval(() => { ensureCurrentWeekPublished().catch(() => {}); }, WEEKLY_PUBLISH_CHECK_EVERY_MS);
 }
 
 // Run the idempotent backfill periodically (e.g. every 5 minutes)
