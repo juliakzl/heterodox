@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { api } from "./api";
-import MatisseTheme from "./MatisseTheme";
 import WeeklyFeed from "./Feed";
 import Ask from "./Ask";
 import WelcomeInvite from "./WelcomeInvite";
@@ -61,7 +60,7 @@ export default function App() {
   if (!me && inviteToken)
     return (
       <>
-        <MatisseTheme />
+       
         <WelcomeInvite token={inviteToken} />
       </>
     );
@@ -70,7 +69,7 @@ export default function App() {
     // No manual sign-in/registration, only Google Sign-In for non-invite users
     return (
       <>
-        <MatisseTheme />
+      
         <div
           className="container"
           style={{ textAlign: "center", marginTop: "20vh" }}
@@ -87,7 +86,7 @@ export default function App() {
 
   return (
     <>
-      <MatisseTheme />
+      
       <div className="container">
         <Nav me={me} onLogout={logout} tab={tab} setTab={setTab} />
 

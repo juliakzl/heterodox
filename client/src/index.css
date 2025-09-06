@@ -1,75 +1,174 @@
-* {
-  box-sizing: border-box;
+/* ---------------------------
+   Editorial tokens (light theme)
+   Tweak these to adjust the vibe
+---------------------------- */
+:root {
+  /* Colors: editorial light with cozy accents */
+  --bg:        #FAF7F2;  /* warm off-white */
+  --text:      #1A1A1A;  /* ink */
+  --muted:     #6D6F73;  /* cool gray labels */
+  --card:      #FFFFFF;  /* surfaces */
+  --border:    #E6E1D9;  /* hairline strokes */
+
+  /* Accents (Matisse-leaning blue + earthy terracotta) */
+  --accent:    #1F4FA0;  /* ultramarine-ish */
+  --accent-2:  #C26649;  /* terracotta for secondary buttons/badges */
+
+  /* Controls */
+  --input-bg:  #FFFFFF;
+  --input-bd:  #DCD6CB;
+  --btn-bg:    var(--accent);
+  --btn-bg-2:  #2B3137;  /* neutral/secondary */
+  --btn-text:  #FFFFFF;
+
+  /* Typography */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  --font-serif: "Fraunces", ui-serif, Georgia, "Times New Roman", serif;
+
+  /* Type scale */
+  --line: 1.5;
+  --h1: clamp(2rem, 2.2vw + 1.4rem, 2.75rem);
+  --h2: clamp(1.5rem, 1.3vw + 1.1rem, 2rem);
+  --h3: 1.25rem;
+  --body: 1rem;
+  --small: 0.875rem;
+
+  /* Radii & spacing */
+  --radius: 12px;
+  --space:  24px;
 }
-body {
+
+/* Optional: dark theme hook (add class="theme-dark" on <body> to use) */
+.theme-dark {
+  --bg:       #0b0c10;
+  --text:     #eaf1f1;
+  --muted:    #9aa5b1;
+  --card:     #14171a;
+  --border:   #252a2f;
+
+  --input-bg: #0f1114;
+  --input-bd: #2a2f35;
+
+  --btn-bg:   #3a83f7;   /* you can switch to --accent for consistency */
+  --btn-bg-2: #2b3137;
+}
+
+/* ---------------------------
+   Base
+---------------------------- */
+* { box-sizing: border-box; }
+
+html, body {
   margin: 0;
-  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto,
-    Helvetica, Arial;
-  background: #0b0c10;
-  color: #eaf1f1;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: var(--line);
 }
-a {
-  color: inherit;
+
+a { color: inherit; }
+
+/* Editorial headings with Fraunces */
+h1, h2, h3, .display, .brand {
+  font-family: var(--font-serif);
+  font-weight: 700;
+  letter-spacing: 0.005em;
+  /* Fraunces variable axes: soften forms, keep wonk subtle */
+  font-variation-settings:
+    "opsz" 36,
+    "wght" 700,
+    "SOFT" 80,
+    "WONK" 0;
+  margin: 0 0 0.5em;
 }
+h1, .display { font-size: var(--h1); }
+h2 { font-size: var(--h2); font-weight: 600; }
+h3 { font-size: var(--h3); font-weight: 600; }
+
+/* Layout */
 .container {
   max-width: 900px;
   margin: 0 auto;
-  padding: 24px;
+  padding: var(--space);
 }
+
+/* Cards */
 .card {
-  background: #14171a;
-  border: 1px solid #252a2f;
-  border-radius: 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   padding: 16px;
   margin-bottom: 16px;
 }
+
+/* Inputs */
 input,
 textarea {
   width: 100%;
-  background: #0f1114;
-  border: 1px solid #2a2f35;
+  background: var(--input-bg);
+  border: 1px solid var(--input-bd);
   border-radius: 10px;
   padding: 12px;
-  color: #eaf1f1;
+  color: var(--text);
+  font: inherit;
 }
+
+.muted {
+  color: var(--muted);
+  font-size: var(--small);
+}
+
+/* Buttons */
 button {
   padding: 10px 14px;
   border: none;
   border-radius: 10px;
-  background: #3a83f7;
-  color: white;
+  background: var(--btn-bg);
+  color: var(--btn-text);
   cursor: pointer;
+  font-weight: 600;
+  transition: transform .04s ease, filter .15s ease;
 }
+button:hover { filter: brightness(0.95); }
+button:active { transform: translateY(1px); }
+
 button.secondary {
-  background: #2b3137;
+  background: var(--btn-bg-2);
+  color: #fff;
 }
+
+/* Layout helpers */
 .row {
   display: flex;
   gap: 12px;
   align-items: center;
 }
-.row > * {
-  flex: 1;
-}
-.muted {
-  color: #9aa5b1;
-  font-size: 12px;
-}
+.row > * { flex: 1; }
+
 .pill {
   display: inline-block;
   padding: 2px 8px;
-  border: 1px solid #2a2f35;
+  border: 1px solid var(--border);
   border-radius: 999px;
-  font-size: 12px;
-  color: #9aa5b1;
+  font-size: var(--small);
+  color: var(--muted);
+  background: transparent;
 }
+
 .list {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
+
 .answer {
-  border: 1px solid #2a2f35;
+  border: 1px solid var(--border);
   padding: 12px;
   border-radius: 10px;
+  background: var(--card);
 }
+
+/* Optional accent utilities */
+.link-accent { color: var(--accent); }
+.badge-warm  { background: color-mix(in oklab, var(--accent-2) 14%, #fff); border-color: color-mix(in oklab, var(--accent-2) 28%, #fff); }
