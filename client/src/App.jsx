@@ -7,7 +7,7 @@ import TodayMain from "./TodayMain";
 import Connections from "./Connections";
 import Nav from "./Nav";
 import './index.css';
-import bg from './assets/background_transparent.png';
+import bg from './assets/bg-big.png';
 import logo2 from "./assets/logo2.png";
 import logo1 from "./assets/logo1.png";
 import logo from "./assets/logo.png";
@@ -74,7 +74,7 @@ export default function App() {
         <>
           <div
             className="container"
-            style={{ textAlign: "center", marginTop: "20vh" }}
+            style={{ textAlign: "center" }}
           >
             <h2>Welcome back!</h2>
             <p className="muted">Sign in to continue</p>

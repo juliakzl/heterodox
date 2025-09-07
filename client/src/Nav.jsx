@@ -1,4 +1,5 @@
-import logo from "./assets/logo.png"; // adjust the path if needed
+import logo from "./assets/logo.png";
+import menu from "./assets/menu.svg";
 
 export default function Nav({ me, onLogout }) {
   return (
@@ -14,9 +15,9 @@ export default function Nav({ me, onLogout }) {
         </div>
         <div style={{ flex: 1 }}></div>
         <div className="pill">{me?.displayName}</div>
-        <button className="secondary" onClick={onLogout}>
-          Log out
-        </button>
+        <button className="secondary" onClick={onLogout} style={{ padding: 0, border: "none", background: "none" }}>
+  <img src={menu} alt="Menu" style={{ height: "24px" }} />
+</button>
       </div>
     </div>
   );
