@@ -3,39 +3,42 @@
    Tweak these to adjust the vibe
 ---------------------------- */
 :root {
-  /* Colors: editorial light with cozy accents */
-  --bg:        #FAF7F2;  /* warm off-white */
-  --text:      #1A1A1A;  /* ink */
-  --muted:     #6D6F73;  /* cool gray labels */
-  --card:      #FFFFFF;  /* surfaces */
-  --border:    #E6E1D9;  /* hairline strokes */
+  /* Background: warm cream, like wallpaper */
+  --bg:        #Ffffff;  /* soft parchment/ivory */
+  --card:      #Ffffff;  /* lighter cream for surfaces */
+  --border:    #3F78C7;  /* warm ochre hairlines */
 
-  /* Accents (Matisse-leaning blue + earthy terracotta) */
-  --accent:    #1F4FA0;  /* ultramarine-ish */
-  --accent-2:  #C26649;  /* terracotta for secondary buttons/badges */
+  /* Text */
+  --text:      #1C1B1B;  /* near-black ink */
+  --muted:     #6A5851;  /* warm muted brown-gray */
+
+  /* Accents */
+  --accent:    #A31817;  /* Matisse red (dresses) */
+  --accent-2:  #2F4A9B;  /* cobalt blue (fireplace, walls) */
+  --accent-3:  #ABCDF3;  /* golden yellow (dress, highlights) */
 
   /* Controls */
   --input-bg:  #FFFFFF;
-  --input-bd:  #DCD6CB;
-  --btn-bg:    var(--accent);
-  --btn-bg-2:  #2B3137;  /* neutral/secondary */
+  --input-bd:  #ABCDF3;
+  --btn-bg:    #3F78C7;
+  --btn-bg-2:  #ABCDF3;
   --btn-text:  #FFFFFF;
 
-  /* Typography */
+  /* Typography (keep as is) */
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
   --font-serif: "Fraunces", ui-serif, Georgia, "Times New Roman", serif;
-
-  /* Type scale */
-  --line: 1.5;
-  --h1: clamp(2rem, 2.2vw + 1.4rem, 2.75rem);
-  --h2: clamp(1.5rem, 1.3vw + 1.1rem, 2rem);
-  --h3: 1.25rem;
-  --body: 1rem;
-  --small: 0.875rem;
 
   /* Radii & spacing */
   --radius: 12px;
   --space:  24px;
+}
+
+body {
+  background-image: url('./assets/background.png');
+  background-repeat: repeat;        /* or no-repeat if you don’t want tiling */
+  background-size: cover;           /* or 'contain' depending on effect */
+  background-position: center;      /* keeps it centered */
+  background-attachment: fixed;     /* optional: makes it scroll nicely */
 }
 
 /* Optional: dark theme hook (add class="theme-dark" on <body> to use) */

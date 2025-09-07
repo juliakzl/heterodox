@@ -1,8 +1,17 @@
+import logo from "./assets/logo.png"; // adjust the path if needed
+
 export default function Nav({ me, onLogout }) {
   return (
     <div className="card" style={{ position: "sticky", top: 0, zIndex: 10 }}>
       <div className="row" style={{ alignItems: "center" }}>
-        <div style={{ fontWeight: 700 }}>heterodox</div>
+        <div style={{ display: "flex", alignItems: "center", fontWeight: 700 }}>
+          <img
+            src={logo}
+            alt="App Logo"
+            style={{ height: "24px", marginRight: "8px" }}
+          />
+          heterodox
+        </div>
         <div style={{ flex: 1 }}></div>
         <div className="pill">{me?.displayName}</div>
         <button className="secondary" onClick={onLogout}>
