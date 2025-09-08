@@ -43,8 +43,40 @@ export async function generateWeeklyAIQuestion(opts = {}) {
     userPrompt,
   } = opts;
 
-  const system = process.env.AI_WEEKLY_SYSTEM
-    || "You craft short, thought-provoking, open-ended questions that spark meaningful discussion. One sentence. No quotes.";
+
+  const examples = [
+  "If you could relive one moment in your life without changing the outcome of it but just for sake of experiencing it again, what would it be?",
+  "Do soulmates exist?",
+  "What is your favourite conspiracy theory?",
+  "What is the most supernatural thing that happened to you?",
+  "How did the first love on earth look like?",
+  "What was the latest new emotion you discovered?",
+  "What comes first: feelings or language?",
+  "How would society change if privacy no longer existed?",
+  "What were the moments when you felt furthest from and closest to understanding another human?",
+  "If you could rerun evolution, what would look differently in your world?",
+  "Do you think Sisyphus is happy right now?",
+  "What do you believe is true that would get you cancelled if said out loud?",
+  "What is the coolest question you ever got asked?",
+  "What is your favorite scientific fact?",
+  "What is the biggest misconception of our time?",
+  "It’s year 1934, you are a German citizen. Would you join the NSDAP Party?",
+  "What is one thing you pretend to understand but secretly don’t?",
+  "What do you think your great-great-grandchildren will find morally horrifying about the way we live now?",
+  "When was the last time you felt completely out of place, like you were dropped into the wrong movie?",
+  "If you had to design a ritual that all humans must perform once in their lives, what would it be?",
+  "If you could choose the exact last thought you’ll ever have, what would it be?",
+  "Which is scarier: that we are alone in the universe, or that we aren’t?",
+  "What’s one moral line you crossed that you’ve never fully forgiven yourself for, even if no one else knows?",
+  "If the person you love most were accused of a terrible crime, would you want to know for certain whether they were guilty?",
+  "What’s something you’ve done that you would judge someone else harshly for doing?",
+  "Are you running from something or towards something?"
+];
+  const examplesList = examples.map((q, i) => `${i + 1}. ${q}`).join('\n');
+
+  const system = process.env.AI_WEEKLY_SYSTEM || `You craft short, thought-provoking, open-ended questions that spark meaningful discussion. One sentence. No quotes. Here are example questions to match the style:
+
+${examplesList}`;
 
   const user = userPrompt || process.env.AI_WEEKLY_USER
     || "Generate ONE thoughtful, open-ended question suitable for a small discussion group. Output ONLY the question text. Good example: Do soulmates exist? Bad example: How does our perception of truth change when we consider perspectives different from our own?";

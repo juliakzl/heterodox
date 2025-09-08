@@ -10,3 +10,5 @@ server/node_modules
 # build outputs
 dist
 build
+server/asa.db-shm
+server/asa.db-wal
