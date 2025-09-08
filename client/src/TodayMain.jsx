@@ -111,11 +111,11 @@ export default function TodayMain({ setTab }) {
 
   return (
     <div className="card">
-      <h3 style={{ margin: 0 }}>This Week’s Question</h3>
+      <div style={{ margin: 0 }}>This Week’s Question</div>
       <div className="pill" style={{ marginTop: 8 }}>
         Week starting {weekLabel || weekly.week_start}
       </div>
-      <p style={{ marginTop: 8, marginBottom: 12 }}>{q.text}</p>
+      <h3 style={{ marginTop: 8, marginBottom: 12 }}>{q.text}</h3>
       {askerName && (
         <div className="muted" style={{ marginTop: 4 }}>
           Asked by {askerName}

@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
+import mic from "./assets/mic.svg";
+
 
 export default function VoiceRecorder({ onText, disabled, uploadUrl = '/api/answers/voice' }) {
   const [recording, setRecording] = useState(false);
@@ -63,14 +65,14 @@ export default function VoiceRecorder({ onText, disabled, uploadUrl = '/api/answ
   }
 
   return (
-    <div style={{ display: 'inline-flex', gap: 8 }}>
+    <div style={{ display: "inline-flex", alignItems: "center" }}>
       {!recording ? (
-        <button onClick={start} disabled={disabled || busy}>
-          🎤 Start
+        <button onClick={start} disabled={disabled || busy} style={{ background: "none", border: "none" }}>
+          <img src={mic} alt="Start recording" style={{ height: 20 }} />
         </button>
       ) : (
         <button onClick={stop} disabled={disabled || busy}>
-          ⏹ Stop &amp; Transcribe
+          ⏹
         </button>
       )}
       {busy && <span>Transcribing…</span>}
