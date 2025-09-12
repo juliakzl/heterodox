@@ -113,7 +113,7 @@ export default function Connections() {
           style={tabStyle(activeTab === "first")}
           onClick={() => setActiveTab("first")}
         >
-          First‑degree
+          Primary
         </button>
         <button
           type="button"
@@ -122,14 +122,14 @@ export default function Connections() {
           style={tabStyle(activeTab === "second")}
           onClick={() => setActiveTab("second")}
         >
-          Second‑degree
+          Mutuals
         </button>
       </div>
 
       {activeTab === "first" && (
         <>
           <div className="row" style={{ justifyContent: "flex-end", marginBottom: 8 }}>
-            <button type="button" onClick={() => setInviteOpen(true)}>Invite someone</button>
+            <button type="button" onClick={() => setInviteOpen(true)}>Invite a friend</button>
           </div>
           <div className="row">
             <input
