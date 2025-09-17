@@ -546,6 +546,55 @@ app.get("/api/connections", (req, res) => {
   res.json({ connections: rows });
 });
 
+// ---------- Questions Book (public API used by frontend) ----------
+// GET /questions_book?page=1&limit=50 -> { data: [...], total }
+app.get("/api/questions_book", (req, res) => {
+  try {
+    const page = Math.max(parseInt(String(req.query.page || "1"), 10) || 1, 1);
+    const limitRaw = parseInt(String(req.query.limit || "50"), 10) || 50;
+    const limit = Math.max(1, Math.min(50, limitRaw)); // cap at 50 as requested
+    const offset = (page - 1) * limit;
+
+    const totalRow = db.prepare("SELECT COUNT(*) as c FROM questions_book").get();
+    const total = Number(totalRow?.c || 0);
+
+    const rows = db.prepare(
+      `SELECT id, question, posted_by, asked_by, date, upvotes
+       FROM questions_book
+       ORDER BY datetime(date) DESC, id DESC
+       LIMIT ? OFFSET ?`
+    ).all(limit, offset);
+
+    res.setHeader("Cache-Control", "no-store");
+    return res.json({ data: rows, total });
+  } catch (e) {
+    console.error("/questions_book failed:", e);
+    return res.status(500).json({ error: "server_error" });
+  }
+});
+
+// POST /questions_book/:id/upvote -> { id, upvotes }
+app.post("/api/questions_book/:id/upvote", (req, res) => {
+  try {
+    const id = parseInt(String(req.params.id), 10);
+    if (!id || Number.isNaN(id)) return res.status(400).json({ error: "invalid_id" });
+
+    const tx = db.transaction((qid) => {
+      const upd = db.prepare("UPDATE questions_book SET upvotes = upvotes + 1 WHERE id = ?").run(qid);
+      if (!upd.changes) return null;
+      const row = db.prepare("SELECT id, upvotes FROM questions_book WHERE id = ?").get(qid);
+      return row;
+    });
+
+    const out = tx(id);
+    if (!out) return res.status(404).json({ error: "not_found" });
+    return res.json(out);
+  } catch (e) {
+    console.error("/questions_book/:id/upvote failed:", e);
+    return res.status(500).json({ error: "server_error" });
+  }
+});
+
 // Second-degree connections (friends-of-friends), excluding self and existing direct connections
 // GET /api/connections/second?limit=50
 app.get("/api/connections/second", (req, res) => {

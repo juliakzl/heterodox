@@ -74,6 +74,21 @@ function ensureBootstrap(db) {
   `;
   db.exec(bootstrap);
 
+  // Add questions_book table and indexes
+  const questionsBookSql = `
+  CREATE TABLE IF NOT EXISTS questions_book (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    question TEXT NOT NULL,
+    posted_by TEXT,
+    asked_by TEXT,
+    date TEXT NOT NULL DEFAULT (datetime('now')),
+    upvotes INTEGER NOT NULL DEFAULT 0
+  );
+  CREATE INDEX IF NOT EXISTS idx_questions_book_date ON questions_book(date);
+  CREATE INDEX IF NOT EXISTS idx_questions_book_upvotes ON questions_book(upvotes);
+  `;
+  db.exec(questionsBookSql);
+
   // Defensive column adds on users table
   try {
     const cols = db.prepare(`PRAGMA table_info(users)`).all().map((c) => c.name);

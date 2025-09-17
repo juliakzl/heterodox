@@ -13,6 +13,7 @@ import logo1 from "./assets/logo1.png";
 import logo from "./assets/logo.png";
 import Events from "./Events";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import QuestionsBook from "./QuestionsBook";
 
 export default function App() {
 
@@ -67,6 +68,7 @@ export default function App() {
     <Router>
       <Routes>
         <Route path="/events" element={<Events />} />
+        <Route path="/questions-book" element={<QuestionsBook />} />
         <Route
           path="/*"
           element={

@@ -1,8 +1,10 @@
 import React, { useState } from "react";
 import bg from "./assets/bg-big.png";
+import CreateEventModal from "./CreateEventModal";
 
 const Events = () => {
   const [showUpcoming, setShowUpcoming] = useState(true);
+  const [showModal, setShowModal] = useState(false);
 
   const upcomingEvents = [
     { id: 1, title: "Conference on AI", date: "2025-10-01" },
@@ -15,8 +17,16 @@ const Events = () => {
   ];
 
   const handleCreateEvent = () => {
-    // Placeholder for navigation or modal
-    alert("Redirect to create event form");
+    setShowModal(true);
+  };
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+  };
+
+  const handleEventCreate = (eventData) => {
+    console.log("Created event:", eventData);
+    setShowModal(false);
   };
 
   const eventsToShow = showUpcoming ? upcomingEvents : pastEvents;
@@ -53,6 +63,9 @@ const Events = () => {
           </li>
         ))}
       </ul>
+      {showModal && (
+        <CreateEventModal onClose={handleCloseModal} onCreate={handleEventCreate} />
+      )}
     </div>
   );
 };
