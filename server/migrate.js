@@ -89,6 +89,21 @@ function ensureBootstrap(db) {
   `;
   db.exec(questionsBookSql);
 
+  // Upvotes table: one row per (question_id, user_id)
+  const upvotesSql = `
+  CREATE TABLE IF NOT EXISTS question_upvotes (
+    question_id INTEGER NOT NULL,
+    user_id     INTEGER NOT NULL,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (question_id, user_id),
+    FOREIGN KEY (question_id) REFERENCES questions_book(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id)     REFERENCES users(id)          ON DELETE CASCADE
+  );
+  CREATE INDEX IF NOT EXISTS idx_question_upvotes_user ON question_upvotes(user_id);
+  CREATE INDEX IF NOT EXISTS idx_question_upvotes_created ON question_upvotes(created_at);
+  `;
+  db.exec(upvotesSql);
+
   // Defensive column adds on users table
   try {
     const cols = db.prepare(`PRAGMA table_info(users)`).all().map((c) => c.name);

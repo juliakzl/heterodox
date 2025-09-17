@@ -573,24 +573,69 @@ app.get("/api/questions_book", (req, res) => {
   }
 });
 
+// Create a new question in questions_book
+// Body: { question: string, asked_by?: string }
+app.post("/api/questions_book", (req, res) => {
+  const me = requireUser(req, res);
+  if (!me) return; // 401 handled in requireUser
+
+  const qText = (req.body?.question || "").trim();
+  const askedBy = (req.body?.asked_by || req.body?.askedBy || null);
+  if (!qText || qText.length < 3) {
+    return res.status(400).json({ error: "question_min_3" });
+  }
+
+  try {
+    const info = db
+      .prepare(
+        `INSERT INTO questions_book (question, posted_by, asked_by, date, upvotes)
+         VALUES (?, ?, ?, ?, 0)`
+      )
+      .run(qText, me.displayName || me.display_name || `user:${me.id}`, askedBy, nowIso());
+
+    const row = db
+      .prepare(
+        `SELECT id, question, posted_by, asked_by, date, upvotes
+         FROM questions_book WHERE id = ?`
+      )
+      .get(info.lastInsertRowid);
+
+    return res.status(201).json(row);
+  } catch (e) {
+    console.error("POST /api/questions_book failed:", e);
+    return res.status(500).json({ error: "server_error" });
+  }
+});
+
 // POST /questions_book/:id/upvote -> { id, upvotes }
 app.post("/api/questions_book/:id/upvote", (req, res) => {
-  try {
-    const id = parseInt(String(req.params.id), 10);
-    if (!id || Number.isNaN(id)) return res.status(400).json({ error: "invalid_id" });
+  const me = requireUser(req, res);
+  if (!me) return; // 401 handled in requireUser
 
-    const tx = db.transaction((qid) => {
-      const upd = db.prepare("UPDATE questions_book SET upvotes = upvotes + 1 WHERE id = ?").run(qid);
-      if (!upd.changes) return null;
-      const row = db.prepare("SELECT id, upvotes FROM questions_book WHERE id = ?").get(qid);
-      return row;
+  try {
+    const qid = parseInt(String(req.params.id), 10);
+    if (!qid || Number.isNaN(qid)) return res.status(400).json({ error: "invalid_id" });
+
+    const tx = db.transaction((questionId, userId) => {
+      // Insert a unique vote; composite PK (question_id, user_id) prevents duplicates
+      const ins = db
+        .prepare(`INSERT OR IGNORE INTO question_upvotes (question_id, user_id) VALUES (?, ?)`)
+        .run(questionId, userId);
+
+      const inserted = ins.changes === 1;
+
+      // Fresh count from votes table
+      const countRow = db
+        .prepare(`SELECT COUNT(*) AS c FROM question_upvotes WHERE question_id = ?`)
+        .get(questionId);
+
+      return { upvotes: Number(countRow.c || 0), alreadyVoted: !inserted };
     });
 
-    const out = tx(id);
-    if (!out) return res.status(404).json({ error: "not_found" });
+    const out = tx(qid, me.id);
     return res.json(out);
   } catch (e) {
-    console.error("/questions_book/:id/upvote failed:", e);
+    console.error("/api/questions_book/:id/upvote failed:", e);
     return res.status(500).json({ error: "server_error" });
   }
 });
