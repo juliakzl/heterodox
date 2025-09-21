@@ -559,7 +559,7 @@ app.get("/api/questions_book", (req, res) => {
     const total = Number(totalRow?.c || 0);
 
     const rows = db.prepare(
-      `SELECT id, question, posted_by, asked_by, date, upvotes
+      `SELECT id, question, posted_by, background, date, upvotes
        FROM questions_book
        ORDER BY datetime(date) DESC, id DESC
        LIMIT ? OFFSET ?`
@@ -574,13 +574,13 @@ app.get("/api/questions_book", (req, res) => {
 });
 
 // Create a new question in questions_book
-// Body: { question: string, asked_by?: string }
+// Body: { question: string, background?: string }
 app.post("/api/questions_book", (req, res) => {
   const me = requireUser(req, res);
   if (!me) return; // 401 handled in requireUser
 
   const qText = (req.body?.question || "").trim();
-  const askedBy = (req.body?.asked_by || req.body?.askedBy || null);
+  const background = (req.body?.background || null);
   if (!qText || qText.length < 3) {
     return res.status(400).json({ error: "question_min_3" });
   }
@@ -588,14 +588,14 @@ app.post("/api/questions_book", (req, res) => {
   try {
     const info = db
       .prepare(
-        `INSERT INTO questions_book (question, posted_by, asked_by, date, upvotes)
+        `INSERT INTO questions_book (question, posted_by, background, date, upvotes)
          VALUES (?, ?, ?, ?, 0)`
       )
-      .run(qText, me.displayName || me.display_name || `user:${me.id}`, askedBy, nowIso());
+      .run(qText, me.displayName || me.display_name || `user:${me.id}`, background, nowIso());
 
     const row = db
       .prepare(
-        `SELECT id, question, posted_by, asked_by, date, upvotes
+        `SELECT id, question, posted_by, background, date, upvotes
          FROM questions_book WHERE id = ?`
       )
       .get(info.lastInsertRowid);

@@ -1,0 +1,1 @@
+ALTER TABLE questions_book RENAME COLUMN asked_by TO background;
