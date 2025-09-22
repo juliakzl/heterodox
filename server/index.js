@@ -559,9 +559,10 @@ app.get("/api/questions_book", (req, res) => {
     const total = Number(totalRow?.c || 0);
 
     const rows = db.prepare(
-      `SELECT id, question, posted_by, background, date, upvotes
-       FROM questions_book
-       ORDER BY datetime(date) DESC, id DESC
+      `SELECT qb.id, qb.question, qb.posted_by, qb.background, qb.date,
+             (SELECT COUNT(*) FROM question_upvotes qu WHERE qu.question_id = qb.id) AS upvotes
+       FROM questions_book qb
+       ORDER BY datetime(qb.date) DESC, qb.id DESC
        LIMIT ? OFFSET ?`
     ).all(limit, offset);
 
@@ -595,8 +596,9 @@ app.post("/api/questions_book", (req, res) => {
 
     const row = db
       .prepare(
-        `SELECT id, question, posted_by, background, date, upvotes
-         FROM questions_book WHERE id = ?`
+        `SELECT qb.id, qb.question, qb.posted_by, qb.background, qb.date,
+               (SELECT COUNT(*) FROM question_upvotes qu WHERE qu.question_id = qb.id) AS upvotes
+         FROM questions_book qb WHERE qb.id = ?`
       )
       .get(info.lastInsertRowid);
 
