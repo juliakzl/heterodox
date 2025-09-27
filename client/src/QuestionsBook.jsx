@@ -76,6 +76,14 @@ export default function QuestionsBook() {
     return () => abort.abort();
   }, [page, sort]);
 
+  // Prompt the user and redirect to Google sign-in
+  const promptSignIn = () => {
+    if (window.confirm("Sign in to upvote this question? You’ll be redirected to Google.")) {
+      const next = window.location.href; // return here after login
+      window.location.href = `/api/auth/google?next=${encodeURIComponent(next)}`;
+    }
+  };
+
   const handleUpvote = async (q) => {
     const id = q.id ?? q._id; // support either id or _id
     if (!id) return;
@@ -85,15 +93,17 @@ export default function QuestionsBook() {
       const res = await fetch(`/api/questions_book/${id}/upvote`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
       });
       if (res.status === 401) {
-        alert("Please sign in to upvote.");
+        // Not signed in: prompt and redirect to Google OAuth
+        setUpvoting((u) => ({ ...u, [id]: false }));
+        promptSignIn();
         return;
       }
       if (!res.ok) throw new Error(`Upvote failed: ${res.status}`);
       const data = await res.json().catch(() => ({}));
       const newCount = data.upvotes;
-      const alreadyVoted = !!data.alreadyVoted;
 
       setQuestions((qs) =>
         qs.map((item) => {
@@ -101,7 +111,6 @@ export default function QuestionsBook() {
           if (!match) return item;
           const next = { ...item };
           if (Number.isFinite(newCount)) next.upvotes = newCount;
-          // Either way, after this call the user has voted (already or just now)
           next.has_upvoted = true;
           return next;
         })

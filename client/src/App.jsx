@@ -82,15 +82,9 @@ export default function App() {
 
               {!me && !inviteToken && (
                 <>
-                  <div
-                    className="container"
-                    style={{ textAlign: "center" }}
-                  >
-                    <h2>Welcome back!</h2>
-                    <p className="muted">Sign in to continue</p>
-                    <a href="/api/auth/google" className="btn">
-                      Continue with Google
-                    </a>
+                  <div className="container">
+                    <QuestionsBook />
+                    <div style={{ height: 72 }} />
                   </div>
                 </>
               )}

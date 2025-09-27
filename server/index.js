@@ -350,48 +350,29 @@ passport.use(
           });
         }
 
-        // 2) New user -> require invite token captured earlier
-        const token = req.session.inviteToken;
-        if (!token) {
-          return done(null, false, { message: "invite_required" });
-        }
-        const invite = Invites.getInvite(token);
-        if (
-          !invite ||
-          (invite.accepted_by_user_id && invite.accepted_by_user_id !== null)
-        ) {
-          return done(null, false, { message: "invalid_or_used_invite" });
+        // 2) New user (no invite required): link by email if present; otherwise create
+        // If there's a user with this email but not yet linked to Google, link it
+        if (email) {
+          const byEmail = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
+          if (byEmail && !byEmail.google_id) {
+            try {
+              db.prepare(
+                "UPDATE users SET google_id = ?, avatar_url = COALESCE(avatar_url, ?), display_name = COALESCE(display_name, ?) WHERE id = ?"
+              ).run(googleId, avatar, displayName, byEmail.id);
+              return done(null, { id: byEmail.id, display_name: byEmail.display_name || displayName });
+            } catch (e) {
+              console.error("Failed linking existing email to Google:", e);
+            }
+          }
         }
 
-        // 3) Create the new user (invite-only)
+        // Otherwise, create a fresh user
         const info = db
           .prepare(
             `INSERT INTO users (display_name, google_id, email, avatar_url, created_at)
-         VALUES (?, ?, ?, ?, ?)`
+             VALUES (?, ?, ?, ?, ?)`
           )
           .run(displayName, googleId, email, avatar, nowIso());
-
-        // Mark invite accepted here (optional; frontend will still post onboarding answer)
-        Invites.markAccepted({
-          token,
-          userId: info.lastInsertRowid,
-          acceptedAt: nowIso(),
-        });
-
-        // Immediately connect inviter & new user (idempotent; relies on UNIQUE constraint)
-        try {
-          const inviterId = (invite && (invite.inviter_id ?? invite.inviterId)) || null;
-          if (inviterId) {
-            connectBothWays(inviterId, Number(info.lastInsertRowid), nowIso());
-          } else {
-            console.warn("Invite present but no inviter_id; skipping auto-connect for user", info.lastInsertRowid);
-          }
-        } catch (e) {
-          console.error("auto-connect on signup failed:", e);
-        }
-
-        // Clear the invite token from session so it can't be reused inadvertently
-        req.session.inviteToken = null;
 
         return done(null, {
           id: info.lastInsertRowid,
@@ -409,11 +390,8 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 // ---------- Auth routes ----------
-// Capture invite token (if present) before sending user to Google
+// Google OAuth: direct authenticate (no invite token capture)
 app.get("/api/auth/google", (req, res, next) => {
-  if (req.query.invite) {
-    req.session.inviteToken = String(req.query.invite);
-  }
   passport.authenticate("google", {
     scope: ["profile", "email"],
     prompt: "select_account",
@@ -423,7 +401,7 @@ app.get("/api/auth/google", (req, res, next) => {
 app.get(
   "/api/auth/google/callback",
   passport.authenticate("google", {
-    failureRedirect: "/api/auth/fail?reason=invite",
+    failureRedirect: "/api/auth/fail?reason=oauth",
   }),
   (req, res) => {
     req.session.user = {
