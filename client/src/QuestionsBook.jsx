@@ -266,15 +266,23 @@ export default function QuestionsBook() {
     margin-left: auto; 
     display: inline-flex; 
     align-items: center; 
-    gap: 8px; 
+    gap: 6px; 
     border: 1px solid var(--border); 
     border-radius: 999px; 
-    padding: 6px 10px; 
+    padding: 4px 8px; 
     background: #fff; 
     cursor: pointer; 
     box-shadow: 0 1px 1px rgba(0,0,0,.03);
     color: var(--text);
+    font-size: 0.9rem;
+    line-height: 1;
+    flex: 0 0 auto;
+    width: auto;
+    white-space: nowrap;
+    min-width: 0;
   }
+  .qb .vote-btn .icon { color: #ABCDF3; font-size: 1rem; line-height: 1; }
+  .qb .vote-btn .count { font-weight: 600; color: #ABCDF3; }
   .qb .vote-btn[disabled] { opacity: .6; cursor: not-allowed; }
 
   .qb .pager { 
@@ -379,7 +387,8 @@ export default function QuestionsBook() {
                     disabled={!!upvoting[id] || q.has_upvoted === 1 || q.has_upvoted === true}
                     aria-label="Upvote question"
                   >
-                    ▲ {q.upvotes ?? 0}
+                    <span className="icon" aria-hidden="true">▲</span>
+                    <span className="count">{q.upvotes ?? 0}</span>
                   </button>
                 </div>
                 <div className="meta">
@@ -432,5 +441,5 @@ function formatDate(input) {
   if (!input) return "";
   const d = new Date(input);
   if (Number.isNaN(d.getTime())) return String(input);
-  return d.toLocaleString();
+  return d.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
 }
