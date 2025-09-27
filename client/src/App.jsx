@@ -100,21 +100,10 @@ export default function App() {
                   <div className="container">
                     <Nav me={me} onLogout={logout} tab={tab} setTab={setTab} />
 
-                    {/* MAIN: Ask button (top-right) + This Week’s Question */}
+                    {/* MAIN: This Week’s Question */}
                     {tab === "Main" && (
                       <>
-                        <div
-                          className="card"
-                          style={{
-                            display: "flex",
-                            justifyContent: "flex-end",
-                            alignItems: "center",
-                            marginBottom: 12,
-                          }}
-                        >
-                          <button onClick={() => setTab("Ask")}>Ask a question</button>
-                        </div>
-                        <TodayMain setTab={setTab} />
+                        <QuestionsBook />
                         <div style={{ marginTop: 16 }} />
                       </>
                     )}

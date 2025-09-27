@@ -7,6 +7,7 @@ export default function QuestionsBook() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [page, setPage] = useState(1);
+  const [sort, setSort] = useState("recent"); // "recent" | "popular"
   const [total, setTotal] = useState(null); // total questions, if provided
   const [upvoting, setUpvoting] = useState({}); // { [id]: boolean }
   const [openBg, setOpenBg] = useState({}); // { [id]: boolean }
@@ -21,8 +22,8 @@ export default function QuestionsBook() {
     return Math.max(1, Math.ceil(total / PAGE_SIZE));
   }, [total]);
 
-  async function fetchQuestions(abortSignal, nextPage = page) {
-    const url = `/api/questions_book?page=${nextPage}&limit=${PAGE_SIZE}`;
+  async function fetchQuestions(abortSignal, nextPage = page, currentSort = sort) {
+    const url = `/api/questions_book?page=${nextPage}&limit=${PAGE_SIZE}&sort=${encodeURIComponent(currentSort)}`;
     const res = await fetch(url, { signal: abortSignal });
     if (!res.ok) throw new Error(`Request failed: ${res.status}`);
     const text = await res.text();
@@ -31,7 +32,29 @@ export default function QuestionsBook() {
     const totalFromBody = !Array.isArray(json) ? json.total : null;
     const totalFromHeader = Number(res.headers.get("X-Total-Count"));
     setTotal(Number.isFinite(totalFromBody) ? totalFromBody : (Number.isFinite(totalFromHeader) ? totalFromHeader : null));
-    setQuestions(items);
+
+    // Fallback client-side sort in case server ignores the sort param
+    const safeDate = (q) => {
+      const d = new Date(q.date);
+      return Number.isNaN(d.getTime()) ? 0 : d.getTime();
+    };
+    const up = (q) => Number.isFinite(Number(q.upvotes)) ? Number(q.upvotes) : 0;
+
+    let sorted = items.slice();
+    if (currentSort === "popular") {
+      sorted.sort((a, b) => {
+        const du = up(b) - up(a);
+        return du !== 0 ? du : (safeDate(b) - safeDate(a));
+      });
+    } else {
+      // recent
+      sorted.sort((a, b) => {
+        const dd = safeDate(b) - safeDate(a);
+        return dd !== 0 ? dd : (up(b) - up(a));
+      });
+    }
+
+    setQuestions(sorted);
   }
 
   useEffect(() => {
@@ -51,7 +74,7 @@ export default function QuestionsBook() {
     }
     load();
     return () => abort.abort();
-  }, [page]);
+  }, [page, sort]);
 
   const handleUpvote = async (q) => {
     const id = q.id ?? q._id; // support either id or _id
@@ -98,6 +121,7 @@ export default function QuestionsBook() {
   const openDialog = () => {
     setQText("");
     setBackground("");
+    setSort("recent");
     setCreating(false);
     if (dialogRef.current && dialogRef.current.showModal) {
       dialogRef.current.showModal();
@@ -129,7 +153,8 @@ export default function QuestionsBook() {
       }
       // After creating, go to page 1 and reload
       setPage(1);
-      await fetchQuestions(undefined, 1);
+      setSort("recent");
+      await fetchQuestions(undefined, 1, "recent");
       closeDialog();
     } catch (err) {
       alert(err.message || "Failed to create question");
@@ -167,6 +192,9 @@ export default function QuestionsBook() {
     justify-content: space-between; 
     margin: 0 0 var(--gap-lg);
   }
+  .qb .tabs { display: inline-flex; gap: 6px; border: 1px solid var(--border); padding: 4px; border-radius: 999px; background: #fff; margin: 0 0 var(--gap); }
+  .qb .tab { appearance: none; border: none; background: transparent; padding: 8px 12px; border-radius: 999px; font-weight: 600; cursor: pointer; color: #ABCDF3; }
+  .qb .tab.active, .qb .tab[aria-selected="true"], .qb .tab:active { background: #ABCDF3; color: #fff; }
   .qb .topbar .spacer { flex: 1; }
   .qb .btn {
     appearance: none;
@@ -322,6 +350,24 @@ export default function QuestionsBook() {
         <div>Loading…</div>
       ) : (
         <>
+          <div className="tabs" role="tablist" aria-label="Question views">
+            <button
+              role="tab"
+              aria-selected={sort === "recent"}
+              className={`tab ${sort === "recent" ? "active" : ""}`}
+              onClick={() => { setSort("recent"); setPage(1); }}
+            >
+              By date
+            </button>
+            <button
+              role="tab"
+              aria-selected={sort === "popular"}
+              className={`tab ${sort === "popular" ? "active" : ""}`}
+              onClick={() => { setSort("popular"); setPage(1); }}
+            >
+              By popularity
+            </button>
+          </div>
           <ul>
             {questions.map((q) => { const id = q.id ?? q._id; const bgText = String(q.background ?? q.asked_by ?? q.askedBy ?? ""); return (
               <li key={id} className="question-card">

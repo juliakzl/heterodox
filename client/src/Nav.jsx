@@ -11,7 +11,7 @@ export default function Nav({ me, onLogout }) {
             alt="App Logo"
             style={{ height: "24px", marginRight: "8px" }}
           />
-          heterodox
+          Good Questions
         </div>
         <div style={{ flex: 1 }}></div>
         <div className="pill">{me?.displayName}</div>
