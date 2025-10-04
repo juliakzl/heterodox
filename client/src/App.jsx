@@ -3,14 +3,10 @@ import { api } from "./api";
 import WeeklyFeed from "./Feed";
 import Ask from "./Ask";
 import WelcomeInvite from "./WelcomeInvite";
-import TodayMain from "./TodayMain";
 import Connections from "./Connections";
 import Nav from "./Nav";
 import './index.css';
-import bg from './assets/bg-big.png';
-import logo2 from "./assets/logo2.png";
-import logo1 from "./assets/logo1.png";
-import logo from "./assets/logo.png";
+import bg from './assets/bg.png';
 import Events from "./Events";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import QuestionsBook from "./QuestionsBook";
@@ -90,66 +86,6 @@ export default function App() {
                       <QuestionsBook />
                       <div style={{ marginTop: 16 }} />
                     </>
-
-                    {/* Spacer so content isn't hidden behind bottom nav */}
-                    <div style={{ height: 72 }} />
-
-                    {/* Bottom menu with three tabs: Feed, Main, Connections */}
-                    <div
-                      style={{
-                        position: "fixed",
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        zIndex: 100,
-                        background: "#fff",
-                        borderTop: "1px solid #eee",
-                      }}
-                    >
-                      <div
-                        className="container"
-                        style={{ paddingTop: 8, paddingBottom: 8 }}
-                      >
-                        <div className="row" style={{ justifyContent: "space-around" }}>
-                          <button
-                            className={tab === "Feed" ? "" : "secondary"}
-                            onClick={() => setTab("Feed")}
-                            style={{
-                              backgroundColor: '#ffffff',
-                              border: 'none',
-                              borderRadius: 8,
-                              padding: '8px 12px',
-                            }}
-                          >
-                            <img src={logo2} alt="Feed" style={{ height: '40px', display: 'block', margin: '0 auto' }} />
-                          </button>
-                          <button
-                            className={tab === "Main" ? "" : "secondary"}
-                            onClick={() => setTab("Main")}
-                            style={{
-                              backgroundColor: '#ffffff',
-                              border: 'none',
-                              borderRadius: 8,
-                              padding: '8px 12px',
-                            }}
-                          >
-                            <img src={logo} alt="Main" style={{ height: '40px', display: 'block', margin: '0 auto' }} />
-                          </button>
-                          <button
-                            className={tab === "Connections" ? "" : "secondary"}
-                            onClick={() => setTab("Connections")}
-                            style={{
-                              backgroundColor: '#ffffff',
-                              border: 'none',
-                              borderRadius: 8,
-                              padding: '8px 12px',
-                            }}
-                          >
-                            <img src={logo1} alt="Connections" style={{ height: '40px', display: 'block', margin: '0 auto' }} />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 </>
               )}
@@ -185,66 +121,6 @@ export default function App() {
 
                     {/* Ask modal only when invoked */}
                     {tab === "Ask" && <Ask onClose={() => setTab("Main")} />}
-
-                    {/* Spacer so content isn't hidden behind bottom nav */}
-                    <div style={{ height: 72 }} />
-
-                    {/* Bottom menu with three tabs: Feed, Main, Connections */}
-                    <div
-                      style={{
-                        position: "fixed",
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        zIndex: 100,
-                        background: "#fff",
-                        borderTop: "1px solid #eee",
-                      }}
-                    >
-                      <div
-                        className="container"
-                        style={{ paddingTop: 8, paddingBottom: 8 }}
-                      >
-                        <div className="row" style={{ justifyContent: "space-around" }}>
-                          <button
-                            className={tab === "Feed" ? "" : "secondary"}
-                            onClick={() => setTab("Feed")}
-                            style={{
-                              backgroundColor: '#ffffff',  // button background
-                              border: 'none',              // remove default border
-                              borderRadius: 8,             // rounded corners
-                              padding: '8px 12px',         // optional padding
-                            }}
-                          >
-                            <img src={logo2} alt="Feed" style={{ height: '40px', display: 'block', margin: '0 auto' }} />
-                          </button>
-                          <button
-                            className={tab === "Main" ? "" : "secondary"}
-                            onClick={() => setTab("Main")}
-                            style={{
-                              backgroundColor: '#ffffff',  // button background
-                              border: 'none',              // remove default border
-                              borderRadius: 8,             // rounded corners
-                              padding: '8px 12px',         // optional padding
-                            }}
-                          >
-                            <img src={logo} alt="Main" style={{ height: '40px', display: 'block', margin: '0 auto' }} />
-                          </button>
-                          <button
-                            className={tab === "Connections" ? "" : "secondary"}
-                            onClick={() => setTab("Connections")}
-                            style={{
-                              backgroundColor: '#ffffff',  // button background              
-                              border: 'none',              // remove default border
-                              borderRadius: 8,             // rounded corners
-                              padding: '8px 12px',         // optional padding
-                            }}
-                          >
-                            <img src={logo1} alt="Connections" style={{ height: '40px', display: 'block', margin: '0 auto' }} />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 </>
               )}

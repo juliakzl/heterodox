@@ -1,9 +1,9 @@
-import logo from "./assets/logo.png";
+import logo from "./assets/logo-new.png";
 import menu from "./assets/menu.svg";
 
 export default function Nav({ me, onLogout }) {
   return (
-    <div className="card" style={{ position: "sticky", top: 0, zIndex: 10 }}>
+    <div style={{ position: "sticky", top: 0, zIndex: 10, border: "none", boxShadow: "none" }}>
       <div className="row" style={{ alignItems: "center" }}>
         <div style={{ display: "flex", alignItems: "center", fontWeight: 700 }}>
           <img
@@ -11,10 +11,9 @@ export default function Nav({ me, onLogout }) {
             alt="App Logo"
             style={{ height: "24px", marginRight: "8px" }}
           />
-          Good Questions
+          <span style={{ color: "#9BA7FA" }}>Good Questions</span>
         </div>
         <div style={{ flex: 1 }}></div>
-        <div className="pill">{me?.displayName}</div>
         <button className="secondary" onClick={onLogout} style={{ padding: 0, border: "none", background: "none" }}>
   <img src={menu} alt="Menu" style={{ height: "24px" }} />
 </button>

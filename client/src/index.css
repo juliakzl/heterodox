@@ -34,7 +34,7 @@
 }
 
 body {
-  background-image: url('./assets/background.png');
+  background-image: url('./assets/bg.png');
   background-repeat: repeat;        /* or no-repeat if you don’t want tiling */
   background-size: cover;           /* or 'contain' depending on effect */
   background-position: center;      /* keeps it centered */

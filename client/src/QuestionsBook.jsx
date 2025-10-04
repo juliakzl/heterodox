@@ -181,13 +181,13 @@ export default function QuestionsBook() {
     --radius: 12px;
     --border: #e7e7ea;
     --muted: #5b6270;
-    --bg: #fafafb;
     --text: #0f1222;
     margin: 0 auto; 
-    padding: clamp(12px, 4vw, 32px); 
-    max-width: 960px; 
+    padding: clamp(12px, 4vw, 32px) 0; 
+    max-width: 100%; 
     color: var(--text);
-    background: var(--bg);
+    width: 100%;
+    box-sizing: border-box;
   }
   .qb h1 {
     margin: 0 0 var(--gap);
@@ -199,11 +199,11 @@ export default function QuestionsBook() {
     gap: var(--gap);
     align-items: center; 
     justify-content: space-between; 
-    margin: 0 0 var(--gap-lg);
+    margin: var(--gap-lg) 0 var(--gap-lg);
   }
   .qb .tabs { display: inline-flex; gap: 6px; border: 1px solid var(--border); padding: 4px; border-radius: 999px; background: #fff; margin: 0 0 var(--gap); }
-  .qb .tab { appearance: none; border: none; background: transparent; padding: 8px 12px; border-radius: 999px; font-weight: 600; cursor: pointer; color: #ABCDF3; }
-  .qb .tab.active, .qb .tab[aria-selected="true"], .qb .tab:active { background: #ABCDF3; color: #fff; }
+  .qb .tab { appearance: none; border: none; background: transparent; padding: 8px 12px; border-radius: 999px; font-weight: 600; cursor: pointer; color: #9BA7FA; }
+  .qb .tab.active, .qb .tab[aria-selected="true"], .qb .tab:active { background: #9BA7FA; color: #fff; }
   .qb .topbar .spacer { flex: 1; }
   .qb .btn {
     appearance: none;
@@ -228,7 +228,8 @@ export default function QuestionsBook() {
     gap: var(--gap);
   }
   .qb .question-card { 
-    background: white; 
+    color: #9BA7FA;
+    background: #ffffff; 
     border: 1px solid var(--border); 
     border-radius: var(--radius); 
     padding: clamp(12px, 2.5vw, 20px); 
@@ -240,9 +241,10 @@ export default function QuestionsBook() {
     font-size: clamp(1rem, 2.2vw, 1.2rem); 
     line-height: 1.35; 
     margin: 0 0 8px; 
+    color: var(--text);
   }
   .qb .meta { 
-    color: var(--muted); 
+    color: inherit; 
     font-size: 0.92rem; 
     display: flex; 
     flex-wrap: wrap; 
@@ -255,17 +257,29 @@ export default function QuestionsBook() {
     border: none;
     padding: 0;
     font: inherit;
-    color: #2b6cb0;
+    color: #9BA7FA;
     cursor: pointer;
-    text-decoration: underline;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
   }
+  .qb .bg-toggle::before {
+    content: "▲";
+    display: inline-block;
+    transform: rotate(90deg); /* right by default */
+    transition: transform .2s ease;
+    font-size: 0.9rem;
+    line-height: 1;
+  }
+  .qb .bg-toggle[aria-expanded="true"]::before { transform: rotate(180deg); }
   .qb .background-panel {
     margin-top: 10px;
     border: 1px dashed var(--border);
     border-radius: 10px;
     padding: 10px 12px;
     background: #fff;
-    color: var(--text);
+    color: inherit;
     font-size: 0.98rem;
     line-height: 1.4;
   }
@@ -282,7 +296,7 @@ export default function QuestionsBook() {
     background: #fff; 
     cursor: pointer; 
     box-shadow: 0 1px 1px rgba(0,0,0,.03);
-    color: var(--text);
+    color: inherit;
     font-size: 0.9rem;
     line-height: 1;
     flex: 0 0 auto;
@@ -290,8 +304,8 @@ export default function QuestionsBook() {
     white-space: nowrap;
     min-width: 0;
   }
-  .qb .vote-btn .icon { color: #ABCDF3; font-size: 1rem; line-height: 1; }
-  .qb .vote-btn .count { font-weight: 600; color: #ABCDF3; }
+  .qb .vote-btn .icon { color: currentColor; font-size: 1rem; line-height: 1; }
+  .qb .vote-btn .count { font-weight: 600; color: currentColor; }
   .qb .vote-btn[disabled] { opacity: .6; cursor: not-allowed; }
 
   .qb .pager { 
@@ -304,30 +318,61 @@ export default function QuestionsBook() {
   .qb .pager span { min-width: 110px; text-align: center; }
 
   /* Dialog styling */
-  .qb dialog { border: none; border-radius: var(--radius); padding: 0; }
-  .qb dialog form { padding: 18px; }
-  .qb dialog h3 { margin: 0 0 12px; }
+  .qb dialog {
+    border: none;
+    border-radius: var(--radius);
+    padding: 0;
+    width: clamp(420px, 80vw, 760px); /* bigger on all devices */
+    max-width: 90vw;
+    color: #9BA7FA; /* inherit from question card color */
+  }
+  .qb dialog * { color: inherit; }
+  .qb dialog form { padding: 24px; }
+  .qb dialog form > div { margin-bottom: 16px; }
+  .qb dialog form > div:last-child { margin-bottom: 0; }
+  .qb dialog label { display: block; width: 100%; font-weight: 600; margin-bottom: 6px; }
   .qb dialog textarea, .qb dialog input[type="text"] {
     width: 100%;
     border: 1px solid var(--border);
     border-radius: 10px;
     padding: 10px 12px;
-    font: inherit;
     background: #fff;
+    color: inherit;
+    margin-top: 6px;
+    box-sizing: border-box;
   }
-  .qb dialog .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+  .qb dialog textarea:focus,
+  .qb dialog textarea:focus-visible,
+  .qb dialog input[type="text"]:focus,
+  .qb dialog input[type="text"]:focus-visible {
+    outline: none;
+    border-color: #9BA7FA;
+    box-shadow: 0 0 0 2px rgba(155, 167, 250, 0.25);
+  }
+  .qb dialog textarea::placeholder,
+  .qb dialog input[type="text"]::placeholder {
+    font-weight: 400; /* thinner */
+    font-size: 0.9em; /* smaller */
+  }
+  .qb dialog .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+  .qb dialog .actions .btn[type="submit"] {
+    background: #9BA7FA;
+    color: #fff;
+    border-color: #9BA7FA;
+  }
+  .qb dialog .actions .btn[type="submit"]:hover { filter: brightness(0.95); }
+  .qb dialog .actions .btn[type="submit"]:active { transform: translateY(1px); }
 
   @media (min-width: 900px) {
-    .qb { max-width: 860px; }
+    .qb { max-width: 100%; }
   }
 `}</style>
       <div className="topbar">
-        <h1>Questions Book</h1>
         <button className="btn" onClick={openDialog}>Ask a question</button>
       </div>
       <dialog ref={dialogRef}>
         <form onSubmit={submitQuestion} method="dialog">
-          <h3>New question</h3>
+          <h3>Add question</h3>
           <div>
             <label>
               Question
@@ -342,13 +387,13 @@ export default function QuestionsBook() {
           </div>
           <div>
             <label>
-              Background (optional)
+              Question story (optional)
               <br />
               <input
                 type="text"
                 value={background}
                 onChange={(e) => setBackground(e.target.value)}
-                placeholder="tell the story of this question"
+                placeholder="e.g., this is what my granda asked me"
               />
             </label>
           </div>
@@ -403,21 +448,17 @@ export default function QuestionsBook() {
                 <div className="meta">
                   <span><strong>Posted by:</strong> {q.posted_by ?? q.postedBy ?? "—"}</span>
                   {bgText.trim() ? (
-                    <>
-                      <span className="dot">•</span>
-                      <button
-                        type="button"
-                        className="bg-toggle"
-                        onClick={() => toggleBg(id)}
-                        aria-expanded={!!openBg[id]}
-                        aria-controls={`bg-${id}`}
-                      >
-                        {openBg[id] ? "Hide background" : "Show background"}
-                      </button>
-                    </>
+                    <button
+                      type="button"
+                      className="bg-toggle"
+                      onClick={() => toggleBg(id)}
+                      aria-expanded={!!openBg[id]}
+                      aria-controls={`bg-${id}`}
+                    >
+                      {openBg[id] ? "Hide background" : "Show background"}
+                    </button>
                   ) : null}
-                  <span className="dot">•</span>
-                  <span title={q.date}> {formatDate(q.date)} </span>
+                  <span title={q.date}>{formatDate(q.date)}</span>
                 </div>
                 {bgText.trim() && openBg[id] && (
                   <div id={`bg-${id}`} className="background-panel">
