@@ -199,12 +199,12 @@ export default function QuestionsBook() {
     gap: var(--gap);
     align-items: center; 
     justify-content: space-between; 
+    flex-wrap: nowrap; /* keep items on one line */
     margin: var(--gap-lg) 0 var(--gap-lg);
   }
-  .qb .tabs { display: inline-flex; gap: 6px; border: 1px solid var(--border); padding: 4px; border-radius: 999px; background: #fff; margin: 0 0 var(--gap); }
+  .qb .tabs { display: inline-flex; gap: 6px; border: 1px solid var(--border); padding: 4px; border-radius: 999px; background: #fff; margin: 0; }
   .qb .tab { appearance: none; border: none; background: transparent; padding: 8px 12px; border-radius: 999px; font-weight: 600; cursor: pointer; color: #9BA7FA; }
   .qb .tab.active, .qb .tab[aria-selected="true"], .qb .tab:active { background: #9BA7FA; color: #fff; }
-  .qb .topbar .spacer { flex: 1; }
   .qb .btn {
     appearance: none;
     border: 1px solid var(--border);
@@ -217,6 +217,13 @@ export default function QuestionsBook() {
     box-shadow: 0 1px 2px rgba(0,0,0,.04);
     color: var(--text);
   }
+  .qb .topbar .btn {
+    background: #9BA7FA;
+    color: #fff;
+    border-color: #9BA7FA;
+  }
+  .qb .topbar .btn:hover { filter: brightness(0.95); }
+  .qb .topbar .btn:active { transform: translateY(1px); }
   .qb .btn:hover { background: #f4f5f7; }
   .qb .btn:active { transform: translateY(1px); }
 
@@ -368,7 +375,27 @@ export default function QuestionsBook() {
   }
 `}</style>
       <div className="topbar">
-        <button className="btn" onClick={openDialog}>Ask a question</button>
+        <div className="tabs" role="tablist" aria-label="Question views">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={sort === "recent"}
+            className={`tab ${sort === "recent" ? "active" : ""}`}
+            onClick={() => { setSort("recent"); setPage(1); }}
+          >
+            By date
+          </button>
+          <button
+            role="tab"
+            type="button"
+            aria-selected={sort === "popular"}
+            className={`tab ${sort === "popular" ? "active" : ""}`}
+            onClick={() => { setSort("popular"); setPage(1); }}
+          >
+            By popularity
+          </button>
+        </div>
+        <button type="button" className="btn" onClick={openDialog}>Ask a question</button>
       </div>
       <dialog ref={dialogRef}>
         <form onSubmit={submitQuestion} method="dialog">
@@ -412,24 +439,6 @@ export default function QuestionsBook() {
         <div>Loading…</div>
       ) : (
         <>
-          <div className="tabs" role="tablist" aria-label="Question views">
-            <button
-              role="tab"
-              aria-selected={sort === "recent"}
-              className={`tab ${sort === "recent" ? "active" : ""}`}
-              onClick={() => { setSort("recent"); setPage(1); }}
-            >
-              By date
-            </button>
-            <button
-              role="tab"
-              aria-selected={sort === "popular"}
-              className={`tab ${sort === "popular" ? "active" : ""}`}
-              onClick={() => { setSort("popular"); setPage(1); }}
-            >
-              By popularity
-            </button>
-          </div>
           <ul>
             {questions.map((q) => { const id = q.id ?? q._id; const bgText = String(q.background ?? q.asked_by ?? q.askedBy ?? ""); return (
               <li key={id} className="question-card">

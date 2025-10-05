@@ -6,7 +6,7 @@ import WelcomeInvite from "./WelcomeInvite";
 import Connections from "./Connections";
 import Nav from "./Nav";
 import './index.css';
-import bg from './assets/bg.png';
+import bg from './assets/bg-blur.png';
 import Events from "./Events";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import QuestionsBook from "./QuestionsBook";
