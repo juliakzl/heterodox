@@ -3,21 +3,14 @@ import cors from "cors";
 import dayjs from "dayjs";
 import "dotenv/config";
 import session from "express-session";
-import passport from "passport";
-import multer from "multer";
 
 import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
 
-import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import * as Invites from "./invites.js";
 import * as Signup from "./signup.js";
-import voiceRouter from './voice.js';
-import { generateWeeklyAIQuestion } from "./ai.js";
-
 const app = express();
-const upload = multer({ limits: { fileSize: 25 * 1024 * 1024 } });
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -58,8 +51,6 @@ app.use(
     },
   })
 );
-
-app.use(voiceRouter);
 
 import db from "./db.js";
 
@@ -124,8 +115,6 @@ function currentWeeklyPhase(weekStartStr, now = dayjs()) {
   return "reveal";
 }
 
-// User ID used to attribute AI-generated weekly questions
-const AI_QUESTION_USER_ID = parseInt(process.env.AI_QUESTION_USER_ID || "1", 10);
 
 // Resolve public base URL: prefer env; in prod fall back to forwarded proto/host; dev => localhost:5173
 function baseUrlFromReq(req) {
@@ -165,94 +154,6 @@ function getWeeklyQuestionRow(weekStartStr) {
   `
     )
     .get(weekStartStr);
-}
-
-// ---------- Weekly auto-publish (scheduler) ----------
-function selectOldestUnusedQuestion() {
-  return db.prepare(`
-    SELECT q.id, q.user_id, q.created_at
-    FROM questions q
-    WHERE q.asked_at IS NULL
-      AND NOT EXISTS (SELECT 1 FROM weekly_rounds w WHERE w.question_id = q.id)
-    ORDER BY q.created_at ASC, q.id ASC
-    LIMIT 1
-  `).get();
-}
-
-function publishOldestForWeek(weekStartStr) {
-  const wk = String(weekStartStr).slice(0, 10);
-  // Do not overwrite an existing weekly entry
-  const exists = db.prepare('SELECT 1 FROM weekly_rounds WHERE week_start = ?').get(wk);
-  // Already published for this week — treat as success (idempotent)
-  if (exists) return true;
-
-  const q = selectOldestUnusedQuestion();
-  if (!q) {
-    console.warn(`Weekly publish: no unused questions available for week ${wk}`);
-    return false;
-  }
-
-  // Publish atomically and mark as used to avoid re-picking
-  const tx = db.transaction(() => {
-    db.prepare(`
-      INSERT INTO weekly_rounds (week_start, question_id, published_at)
-      VALUES (?, ?, ?)
-    `).run(wk, q.id, nowIso());
-
-    db.prepare(`
-      UPDATE questions SET asked_at = ? WHERE id = ? AND asked_at IS NULL
-    `).run(nowIso(), q.id);
-  });
-  tx();
-
-  console.log(`Weekly publish: week=${wk} question_id=${q.id}`);
-  return true;
-}
-
-async function ensureCurrentWeekPublished() {
-  const wk = weekStartMonday();
-  try {
-    // 1) Try to publish the oldest human-submitted question
-    if (publishOldestForWeek(wk)) return true;
-
-    // 2) None available — generate one with AI and publish it
-    let text = null;
-    try {
-      text = await generateWeeklyAIQuestion();
-    } catch (e) {
-      console.error("AI question generation failed:", e);
-      text = null;
-    }
-    if (!text || typeof text !== "string" || text.trim().length < 5) {
-      console.warn("AI generation returned no usable question, skipping publish for week", wk);
-      return false;
-    }
-
-    // Only insert an AI question if there are no other unused ones.
-    // Guard against duplicate inserts for the same (AI user, qdate).
-    const existingAI = db.prepare(`
-      SELECT id FROM questions
-      WHERE user_id = ? AND qdate = ? AND asked_at IS NULL
-    `).get(AI_QUESTION_USER_ID, today());
-
-    let insertedId = existingAI?.id || null;
-    if (!insertedId) {
-      const insert = db.prepare(`
-        INSERT INTO questions (user_id, qdate, text, created_at)
-        VALUES (?, ?, ?, ?)
-      `).run(AI_QUESTION_USER_ID, today(), text.trim(), nowIso());
-      insertedId = insert.lastInsertRowid;
-      console.log(`Inserted AI weekly question id=${insertedId} for week=${wk}`);
-    } else {
-      console.log(`Reusing existing AI question id=${insertedId} for today`);
-    }
-
-    // Publish (will no-op if already published)
-    return publishOldestForWeek(wk);
-  } catch (e) {
-    console.error("ensureCurrentWeekPublished failed:", e);
-    return false;
-  }
 }
 
 // ---------- Connection helpers & backfill ----------
@@ -309,128 +210,8 @@ function backfillConnectionsFromInvites() {
   console.log(`Connections backfill: invites processed=${rows.length}, edges created=${created}`);
 }
 
-// ---------- Passport (Google OAuth 2.0) ----------
-passport.serializeUser((user, done) =>
-  done(null, { id: user.id, displayName: user.display_name })
-);
-passport.deserializeUser((obj, done) => done(null, obj));
-
-passport.use(
-  new GoogleStrategy(
-    {
-      clientID: process.env.GOOGLE_CLIENT_ID || "",
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
-      callbackURL: "/api/auth/google/callback", // reverse proxy keeps scheme/host
-      passReqToCallback: true,
-    },
-    (req, accessToken, refreshToken, profile, done) => {
-      try {
-        const googleId = profile.id;
-        const email = profile.emails?.[0]?.value || null;
-        const displayName =
-          profile.displayName || email?.split("@")[0] || "User";
-        const avatar = profile.photos?.[0]?.value || null;
-
-        // 1) Existing user? allow login with or without invite.
-        let user = db
-          .prepare("SELECT * FROM users WHERE google_id = ?")
-          .get(googleId);
-        if (!user && email) {
-          // only treat as existing if the email is already linked to Google
-          user = db
-            .prepare(
-              "SELECT * FROM users WHERE email = ? AND google_id IS NOT NULL"
-            )
-            .get(email);
-        }
-        if (user) {
-          return done(null, {
-            id: user.id,
-            display_name: user.display_name || displayName,
-          });
-        }
-
-        // 2) New user (no invite required): link by email if present; otherwise create
-        // If there's a user with this email but not yet linked to Google, link it
-        if (email) {
-          const byEmail = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
-          if (byEmail && !byEmail.google_id) {
-            try {
-              db.prepare(
-                "UPDATE users SET google_id = ?, avatar_url = COALESCE(avatar_url, ?), display_name = COALESCE(display_name, ?) WHERE id = ?"
-              ).run(googleId, avatar, displayName, byEmail.id);
-              return done(null, { id: byEmail.id, display_name: byEmail.display_name || displayName });
-            } catch (e) {
-              console.error("Failed linking existing email to Google:", e);
-            }
-          }
-        }
-
-        // Otherwise, create a fresh user
-        const info = db
-          .prepare(
-            `INSERT INTO users (display_name, google_id, email, avatar_url, created_at)
-             VALUES (?, ?, ?, ?, ?)`
-          )
-          .run(displayName, googleId, email, avatar, nowIso());
-
-        return done(null, {
-          id: info.lastInsertRowid,
-          display_name: displayName,
-        });
-      } catch (e) {
-        console.error("GoogleStrategy error:", e);
-        return done(e);
-      }
-    }
-  )
-);
-
-app.use(passport.initialize());
-app.use(passport.session());
-
-// ---------- Auth routes ----------
-// Google OAuth: direct authenticate (no invite token capture)
-app.get("/api/auth/google", (req, res, next) => {
-  passport.authenticate("google", {
-    scope: ["profile", "email"],
-    prompt: "select_account",
-  })(req, res, next);
-});
-
-app.get(
-  "/api/auth/google/callback",
-  passport.authenticate("google", {
-    failureRedirect: "/api/auth/fail?reason=oauth",
-  }),
-  (req, res) => {
-    req.session.user = {
-      id: req.user.id,
-      displayName: req.user.displayName || req.user.display_name,
-    };
-    const expected = (process.env.BASE_URL || "").trim().replace(/\/+$/, "");
-    if (expected) {
-      // Always send the browser to the public frontend origin after OAuth
-      return res.redirect(expected + "/");
-    }
-    // Dev fallback if BASE_URL isn't set
-    if (process.env.NODE_ENV !== "production") {
-      return res.redirect("http://localhost:5173/");
-    }
-    // Last resort: stay on current origin
-    return res.redirect("/");
-  }
-);
-
-app.get("/api/auth/fail", (req, res) => {
-  res.status(401).json({ error: req.query.reason || "auth_failed" });
-});
-
 app.post("/api/logout", (req, res) => {
-  try {
-    req.logout?.(() => {});
-  } catch {}
-  req.session.destroy(() => {
+  req.session?.destroy(() => {
     res.clearCookie("asa_sess");
     res.json({ ok: true });
   });
@@ -1141,33 +922,6 @@ try {
   console.warn("Could not ensure connections unique index:", e && e.message ? e.message : e);
 }
 
-
-// Kick off weekly auto-publish on boot and poll periodically (idempotent)
-const WEEKLY_PUBLISH_CHECK_EVERY_MS = parseInt(process.env.WEEKLY_PUBLISH_CHECK_EVERY_MS || '300000', 10); // default 5 min
-if (process.env.WEEKLY_PUBLISH_DISABLED !== '1') {
-  // Ensure current week has a published question right away (fire-and-forget)
-  ensureCurrentWeekPublished().catch(() => {});
-  // Then keep checking; when a new Monday arrives this will insert for the new week
-  setInterval(() => { ensureCurrentWeekPublished().catch(() => {}); }, WEEKLY_PUBLISH_CHECK_EVERY_MS);
-}
-
-// Run the idempotent backfill periodically (e.g. every 5 minutes)
-const BACKFILL_INTERVAL_MS = parseInt(process.env.CONNECTIONS_BACKFILL_EVERY_MS || '300000', 10);
-
-let backfillRunning = false;
-setInterval(() => {
-  if (backfillRunning) return;
-  backfillRunning = true;
-  try {
-    backfillConnectionsFromInvites(); // INSERT OR IGNORE -> safe upsert
-  } catch (e) {
-    console.error("Periodic connections backfill failed:", e);
-  } finally {
-    backfillRunning = false;
-  }
-}, BACKFILL_INTERVAL_MS);
-// On boot: rebuild any missing connections from accepted invites (no deletes)
-backfillConnectionsFromInvites();
 
 // app.get('/', (req, res) => {
 //   const expected = (process.env.BASE_URL || '').trim().replace(/\/+$/, '');

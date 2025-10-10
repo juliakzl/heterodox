@@ -1,24 +1,13 @@
 import { useState } from "react";
 
-const API_BASE =
-  (typeof import.meta !== "undefined" &&
-    import.meta.env &&
-    typeof import.meta.env.VITE_API_BASE !== "undefined")
-    ? import.meta.env.VITE_API_BASE
-    : ((typeof import.meta !== "undefined" && import.meta.env && import.meta.env.DEV)
-        ? "http://localhost:4000"
-        : "");
-
 /**
  * Invite onboarding "carousel"
  * Page 1: user writes their answer to the starter question
  * Page 2: user provides first name, last name, and city
  *
- * On submit (page 2), we stash {token, answer, firstName, lastName, city}
- * into localStorage under "pendingInvite" and then redirect to Google OAuth.
- * After Google callback (user is logged in), your post-login finalizer
- * should read "pendingInvite" and upsert users.first_name, users.last_name, users.city
- * (and persist the answer).
+ * Historically the second step handed off to Google OAuth. That flow is now
+ * disabled, so the form simply captures input and reports that sign-up is
+ * unavailable.
  */
 export default function WelcomeInvite({ token }) {
   const [step, setStep] = useState(0); // 0 = question, 1 = name+city
@@ -61,7 +50,7 @@ export default function WelcomeInvite({ token }) {
       return;
     }
 
-    // Step 1 => final submit: stash + redirect to Google
+    // Step 1 => final submit: stash form data, then surface disabled message
     try {
       setBusy(true);
       const payload = {
@@ -72,14 +61,11 @@ export default function WelcomeInvite({ token }) {
         city: city.trim(),
       };
       localStorage.setItem("pendingInvite", JSON.stringify(payload));
-      const url =
-        (API_BASE || "") +
-        "/api/auth/google?invite=" +
-        encodeURIComponent(resolvedToken);
-      window.location.href = url;
+      setErr("Sign-up is currently disabled. Please try again later.");
     } catch (e) {
-      setBusy(false);
       setErr(e?.message || "Something went wrong.");
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -186,17 +172,17 @@ export default function WelcomeInvite({ token }) {
             title={!resolvedToken && step === 0 ? "Missing invite token" : undefined}
           >
             {busy
-              ? "Redirecting…"
+              ? "Working…"
               : step === 0
               ? "Continue"
-              : "Join with Google"}
+              : "Finish"}
           </button>
         </div>
 
         <div className="muted" style={{ marginTop: 8 }}>
           {step === 0
             ? "You’ll confirm details on the next step."
-            : "You’ll be prompted to sign in with Google. We’ll save your name and city with your new account."}
+            : "Sign-up is currently disabled. We’ll keep your draft saved locally."}
         </div>
       </div>
     </div>

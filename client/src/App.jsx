@@ -65,6 +65,7 @@ export default function App() {
       <Routes>
         <Route path="/events" element={<Events />} />
         <Route path="/questions-book" element={<QuestionsBook />} />
+        <Route path="/welcome" element={<WelcomeInvite />} />
         <Route
           path="/*"
           element={

@@ -11,6 +11,8 @@ export default function QuestionsBook() {
   const [total, setTotal] = useState(null); // total questions, if provided
   const [upvoting, setUpvoting] = useState({}); // { [id]: boolean }
   const [openBg, setOpenBg] = useState({}); // { [id]: boolean }
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authReturnUrl, setAuthReturnUrl] = useState("");
 
   const [creating, setCreating] = useState(false);
   const [qText, setQText] = useState("");
@@ -76,12 +78,38 @@ export default function QuestionsBook() {
     return () => abort.abort();
   }, [page, sort]);
 
-  // Prompt the user and redirect to Google sign-in
-  const promptSignIn = () => {
-    if (window.confirm("Sign in to upvote this question? You’ll be redirected to Google.")) {
-      const next = window.location.href; // return here after login
-      window.location.href = `/api/auth/google?next=${encodeURIComponent(next)}`;
-    }
+  useEffect(() => {
+    if (!authModalOpen) return undefined;
+    const onKey = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeAuthModal();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [authModalOpen]);
+
+  const openAuthModal = () => {
+    const { origin, pathname, search } = window.location;
+    setAuthReturnUrl(`${origin}${pathname}${search}`);
+    setAuthModalOpen(true);
+  };
+
+  const closeAuthModal = () => {
+    setAuthModalOpen(false);
+    setAuthReturnUrl("");
+  };
+
+  const handleAuthLogin = () => {
+    const next = authReturnUrl || window.location.href;
+    closeAuthModal();
+    window.location.href = `/api/auth/google?next=${encodeURIComponent(next)}`;
+  };
+
+  const handleAuthSignup = () => {
+    closeAuthModal();
+    window.location.href = `${window.location.origin}/welcome`;
   };
 
   const handleUpvote = async (q) => {
@@ -96,9 +124,8 @@ export default function QuestionsBook() {
         credentials: "include",
       });
       if (res.status === 401) {
-        // Not signed in: prompt and redirect to Google OAuth
         setUpvoting((u) => ({ ...u, [id]: false }));
-        promptSignIn();
+        openAuthModal();
         return;
       }
       if (!res.ok) throw new Error(`Upvote failed: ${res.status}`);
@@ -175,6 +202,7 @@ export default function QuestionsBook() {
   return (
     <div className="qb">
       <style>{`
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@400;600;700&display=swap');
   .qb { 
     --gap: 16px; 
     --gap-lg: 24px;
@@ -244,6 +272,7 @@ export default function QuestionsBook() {
   }
   .qb .row { display: flex; align-items: flex-start; gap: 12px; }
   .qb .question-text { 
+    font-family: 'Fraunces', serif;
     font-weight: 650; 
     font-size: clamp(1rem, 2.2vw, 1.2rem); 
     line-height: 1.35; 
@@ -370,6 +399,72 @@ export default function QuestionsBook() {
   .qb dialog .actions .btn[type="submit"]:hover { filter: brightness(0.95); }
   .qb dialog .actions .btn[type="submit"]:active { transform: translateY(1px); }
 
+  .qb .auth-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 18, 34, 0.42);
+    backdrop-filter: blur(2px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 16px;
+  }
+  .qb .auth-modal {
+    background: #ffffff;
+    border-radius: 16px;
+    box-shadow: 0 18px 48px rgba(15, 18, 34, 0.35);
+    width: min(420px, 92vw);
+    padding: 28px;
+    display: grid;
+    gap: 16px;
+    position: relative;
+  }
+  .qb .auth-modal h3 {
+    margin: 0;
+    font-size: 1.35rem;
+    letter-spacing: -0.01em;
+  }
+  .qb .auth-modal .muted {
+    color: var(--muted);
+  }
+  .qb .auth-modal .actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .qb .auth-modal button {
+    border-radius: 999px;
+    padding: 10px 18px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform .05s ease, box-shadow .2s ease, background .2s ease;
+  }
+  .qb .auth-modal button.primary {
+    background: #111321;
+    color: #fff;
+    border: none;
+  }
+  .qb .auth-modal button.primary:hover {
+    filter: brightness(1.05);
+  }
+  .qb .auth-modal button.secondary {
+    border: 1px solid var(--border);
+    background: #f6f7fb;
+    color: var(--text);
+  }
+  .qb .auth-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    border: none;
+    background: transparent;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 4px;
+    line-height: 1;
+  }
+
   @media (min-width: 900px) {
     .qb { max-width: 100%; }
   }
@@ -491,6 +586,56 @@ export default function QuestionsBook() {
             </button>
           </div>
         </>
+      )}
+
+      {authModalOpen && (
+        <div
+          className="auth-modal-backdrop"
+          role="presentation"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              closeAuthModal();
+            }
+          }}
+        >
+          <div
+            className="auth-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="auth-modal-title"
+          >
+            <button
+              type="button"
+              className="auth-close"
+              aria-label="Close"
+              onClick={closeAuthModal}
+            >
+              ✕
+            </button>
+            <div>
+              <h3 id="auth-modal-title">Join heterodox</h3>
+              <p className="muted" style={{ marginTop: 8 }}>
+                Upvoting questions is for members only. Do you already have an account?
+              </p>
+            </div>
+            <div className="actions">
+              <button
+                type="button"
+                className="primary"
+                onClick={handleAuthLogin}
+              >
+                Log in with Google
+              </button>
+              <button
+                type="button"
+                className="secondary"
+                onClick={handleAuthSignup}
+              >
+                Sign up
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
