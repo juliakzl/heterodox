@@ -16,31 +16,29 @@ export default function App() {
   const [me, setMe] = useState(null);
   const [tab, setTab] = useState("Main");
 
-  const inviteToken = (() => {
-    // 1) query string ?invite=TOKEN
-    const qs = new URLSearchParams(window.location.search).get("invite");
-    if (qs) return qs;
-    // 2) pretty path /invite/TOKEN
-    const m = window.location.pathname.match(/^\/invite\/([^/?#]+)/);
-    return m ? decodeURIComponent(m[1]) : null;
-  })();
-
-  // After login, finalize any pending invite we stashed before auth.
-  const finishPendingInvite = async () => {
-    const raw = localStorage.getItem("pendingInvite");
-    if (!raw) return;
+  // After login, finalize any pending onboarding data we stashed before auth.
+  const finishPendingSignup = async () => {
+    if (typeof window === "undefined") return;
+    const storage = window.localStorage;
+    if (!storage) return;
+    const raw = storage.getItem("pendingSignup");
+    if (!raw) {
+      storage.removeItem("pendingInvite"); // cleanup legacy key
+      return;
+    }
     try {
-      const { token, answer } = JSON.parse(raw);
-      if (!token || !answer) return;
-      await api("/api/invite/accept", {
+      const payload = JSON.parse(raw);
+      if (!payload || !payload.answer || payload.answer.trim().length < 10) return;
+      await api("/api/signup/complete", {
         method: "POST",
-        body: JSON.stringify({ token, answer }),
+        body: JSON.stringify(payload),
       });
     } catch (e) {
       // You may want to surface this in UI; for now, log it.
-      console.error("Failed to finalize invite:", e);
+      console.error("Failed to finalize signup:", e);
     } finally {
-      localStorage.removeItem("pendingInvite");
+      storage.removeItem("pendingSignup");
+      storage.removeItem("pendingInvite");
     }
   };
 
@@ -48,7 +46,7 @@ export default function App() {
     const j = await api("/api/me");
     setMe(j.user);
     if (j.user) {
-      await finishPendingInvite();
+      await finishPendingSignup();
     }
   };
   useEffect(() => {
@@ -70,14 +68,7 @@ export default function App() {
           path="/*"
           element={
             <div style={{ backgroundImage: `url(${bg})`, backgroundSize: 'cover', backgroundPosition: 'center', minHeight: '100vh' }}>
-              {/* NEW: If unauthenticated AND invite token exists → show WelcomeInvite first. */}
-              {!me && inviteToken && (
-                <>
-                  <WelcomeInvite token={inviteToken} />
-                </>
-              )}
-
-              {!me && !inviteToken && (
+              {!me && (
                 <>
                   <div className="container">
                     <Nav me={me} onLogout={logout} tab={tab} setTab={setTab} />

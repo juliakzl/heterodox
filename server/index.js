@@ -3,6 +3,7 @@ import cors from "cors";
 import dayjs from "dayjs";
 import "dotenv/config";
 import session from "express-session";
+import crypto from "crypto";
 
 import path from "path";
 import { fileURLToPath } from "url";
@@ -13,6 +14,12 @@ import * as Signup from "./signup.js";
 const app = express();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const GOOGLE_CLIENT_ID = (process.env.GOOGLE_CLIENT_ID || "").trim();
+const GOOGLE_CLIENT_SECRET = (process.env.GOOGLE_CLIENT_SECRET || "").trim();
+const GOOGLE_SCOPES =
+  (process.env.GOOGLE_AUTH_SCOPES || "openid email profile").trim();
+const CLIENT_BASE_URL = (process.env.CLIENT_BASE_URL || "").trim();
 
 app.set("trust proxy", 1); // important behind nginx/https
 
@@ -53,6 +60,94 @@ app.use(
 );
 
 import db from "./db.js";
+
+function ensureUserProfileColumns() {
+  try {
+    const cols = db
+      .prepare("PRAGMA table_info(users)")
+      .all()
+      .map((row) => row.name);
+    const statements = [];
+    if (!cols.includes("first_name")) {
+      statements.push("ALTER TABLE users ADD COLUMN first_name TEXT");
+    }
+    if (!cols.includes("last_name")) {
+      statements.push("ALTER TABLE users ADD COLUMN last_name TEXT");
+    }
+    if (!cols.includes("photo_url")) {
+      statements.push("ALTER TABLE users ADD COLUMN photo_url TEXT");
+    }
+    if (!cols.includes("email_verified")) {
+      statements.push("ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0");
+    }
+    if (!cols.includes("city")) {
+      statements.push("ALTER TABLE users ADD COLUMN city TEXT");
+    }
+    if (!cols.includes("created_at")) {
+      statements.push("ALTER TABLE users ADD COLUMN created_at TEXT");
+    }
+    if (!cols.includes("updated_at")) {
+      statements.push("ALTER TABLE users ADD COLUMN updated_at TEXT");
+    }
+    if (!statements.length) return;
+    const tx = db.transaction(() => {
+      for (const sql of statements) {
+        db.prepare(sql).run();
+      }
+      db.prepare(
+        `UPDATE users
+         SET created_at = COALESCE(created_at, datetime('now')),
+             updated_at = COALESCE(updated_at, datetime('now')),
+             email_verified = COALESCE(email_verified, 0)`
+      ).run();
+    });
+    tx();
+  } catch (err) {
+    console.error("Failed to ensure user profile columns:", err);
+  }
+}
+
+ensureUserProfileColumns();
+function ensureQuestionsBookColumns() {
+  try {
+    const cols = db
+      .prepare("PRAGMA table_info(questions_book)")
+      .all()
+      .map((row) => row.name);
+
+    const statements = [];
+    if (!cols.includes("user_id")) {
+      statements.push("ALTER TABLE questions_book ADD COLUMN user_id INTEGER");
+    }
+    if (!cols.includes("background")) {
+      statements.push("ALTER TABLE questions_book ADD COLUMN background TEXT");
+    }
+    if (!cols.includes("posted_by")) {
+      statements.push("ALTER TABLE questions_book ADD COLUMN posted_by TEXT");
+    }
+    if (!cols.includes("date")) {
+      statements.push("ALTER TABLE questions_book ADD COLUMN date TEXT NOT NULL DEFAULT (datetime('now'))");
+    }
+    if (!cols.includes("upvotes")) {
+      statements.push("ALTER TABLE questions_book ADD COLUMN upvotes INTEGER NOT NULL DEFAULT 0");
+    }
+    if (statements.length) {
+      const tx = db.transaction(() => {
+        for (const sql of statements) {
+          db.prepare(sql).run();
+        }
+      });
+      tx();
+    }
+    db.prepare(
+      "CREATE INDEX IF NOT EXISTS idx_questions_book_user ON questions_book(user_id)"
+    ).run();
+  } catch (err) {
+    console.error("Failed to ensure questions_book columns:", err);
+  }
+}
+
+ensureQuestionsBookColumns();
 
 // ---------- Weekly Rounds (global weekly question) ----------
 db.exec(`
@@ -142,6 +237,36 @@ function baseUrlFromReq(req) {
   return "/";
 }
 
+function sanitizeNextUrl(req, rawNext) {
+  if (!rawNext || typeof rawNext !== "string") return "/";
+  const trimmed = rawNext.trim();
+  if (!trimmed) return "/";
+  if (trimmed.startsWith("/")) {
+    // Prevent protocol-relative URLs like //evil.com
+    return trimmed.startsWith("//") ? "/" : trimmed;
+  }
+  try {
+    const candidate = new URL(trimmed, baseUrlFromReq(req));
+    const base = baseUrlFromReq(req);
+    if (candidate.origin === base) {
+      return (
+        candidate.pathname +
+        (candidate.search || "") +
+        (candidate.hash || "")
+      );
+    }
+  } catch (e) {
+    // ignore parse errors
+  }
+  return "/";
+}
+
+function getGoogleRedirectUri(req) {
+  const env = (process.env.GOOGLE_REDIRECT_URI || "").trim();
+  if (env) return env;
+  return `${baseUrlFromReq(req)}/api/auth/google/callback`;
+}
+
 function getWeeklyQuestionRow(weekStartStr) {
   return db
     .prepare(
@@ -219,6 +344,259 @@ app.post("/api/logout", (req, res) => {
 
 app.get("/api/me", (req, res) => {
   res.json({ user: req.session.user || null });
+});
+
+app.get("/api/auth/google", (req, res) => {
+  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+    return res
+      .status(500)
+      .type("text/plain")
+      .send("Google OAuth is not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.");
+  }
+  const rawNext =
+    typeof req.query.next === "string"
+      ? req.query.next
+      : Array.isArray(req.query.next)
+      ? req.query.next[0]
+      : "";
+  const next = sanitizeNextUrl(req, rawNext);
+  const state = crypto.randomBytes(16).toString("hex");
+  req.session.oauthState = state;
+  req.session.oauthNext = next;
+  let returnOrigin = CLIENT_BASE_URL || baseUrlFromReq(req);
+  if (rawNext) {
+    try {
+      const nextUrl = new URL(rawNext, baseUrlFromReq(req));
+      if (!CLIENT_BASE_URL) {
+        returnOrigin = `${nextUrl.protocol}//${nextUrl.host}`;
+      } else {
+        const expected = new URL(CLIENT_BASE_URL);
+        if (expected.host === nextUrl.host) {
+          returnOrigin = `${expected.protocol}//${expected.host}`;
+        }
+      }
+    } catch (e) {
+      // ignore parse error, fallback to referer/base
+    }
+  }
+  const referer = req.headers.referer || req.headers.referrer;
+  if (!CLIENT_BASE_URL && referer && typeof referer === "string") {
+    try {
+      const parsed = new URL(referer);
+      const fallback = new URL(returnOrigin);
+      if (parsed.hostname === fallback.hostname) {
+        returnOrigin = `${parsed.protocol}//${parsed.host}`;
+      } else if (
+        ["localhost", "127.0.0.1", "[::1]"].includes(parsed.hostname)
+      ) {
+        returnOrigin = `${parsed.protocol}//${parsed.host}`;
+      }
+    } catch (e) {
+      // ignore parse error, keep default
+    }
+  }
+  req.session.oauthReturnOrigin = returnOrigin;
+  const redirectUri = getGoogleRedirectUri(req);
+  const params = new URLSearchParams({
+    client_id: GOOGLE_CLIENT_ID,
+    redirect_uri: redirectUri,
+    response_type: "code",
+    scope: GOOGLE_SCOPES,
+    access_type: "offline",
+    include_granted_scopes: "true",
+    state,
+    prompt: "consent",
+  });
+  const url = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+  res.redirect(url);
+});
+
+app.get("/api/auth/google/callback", async (req, res) => {
+  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+    return res
+      .status(500)
+      .type("text/plain")
+      .send("Google OAuth is not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.");
+  }
+  const { code, state, error: oauthError } = req.query;
+  const cleanup = () => {
+    delete req.session.oauthState;
+    delete req.session.oauthNext;
+    delete req.session.oauthReturnOrigin;
+  };
+  if (oauthError) {
+    console.warn("Google OAuth returned error:", oauthError);
+    cleanup();
+    return res.redirect("/?authError=google_oauth_error");
+  }
+  if (!code || typeof code !== "string") {
+    cleanup();
+    return res.status(400).json({ error: "missing_code" });
+  }
+  if (!state || state !== req.session.oauthState) {
+    cleanup();
+    return res.status(400).json({ error: "invalid_state" });
+  }
+
+  const redirectUri = getGoogleRedirectUri(req);
+  try {
+    const tokenParams = new URLSearchParams({
+      code,
+      client_id: GOOGLE_CLIENT_ID,
+      client_secret: GOOGLE_CLIENT_SECRET,
+      redirect_uri: redirectUri,
+      grant_type: "authorization_code",
+    });
+    const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: tokenParams.toString(),
+    });
+    if (!tokenRes.ok) {
+      const txt = await tokenRes.text().catch(() => "");
+      console.error("Google token exchange failed:", tokenRes.status, txt);
+      cleanup();
+      return res.redirect("/?authError=google_token_exchange_failed");
+    }
+    const tokens = await tokenRes.json();
+    if (!tokens.access_token) {
+      console.error("Google token exchange response missing access_token:", tokens);
+      cleanup();
+      return res.redirect("/?authError=google_token_missing");
+    }
+
+    const profileRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+      headers: { Authorization: `Bearer ${tokens.access_token}` },
+    });
+    if (!profileRes.ok) {
+      const txt = await profileRes.text().catch(() => "");
+      console.error("Google userinfo failed:", profileRes.status, txt);
+      cleanup();
+      return res.redirect("/?authError=google_userinfo_failed");
+    }
+
+    const profile = await profileRes.json();
+    const sub = profile?.sub;
+    if (!sub) {
+      console.error("Google profile missing sub:", profile);
+      cleanup();
+      return res.redirect("/?authError=google_profile_missing_sub");
+    }
+
+    const emailRaw = (profile.email || "").trim();
+    const email = emailRaw ? emailRaw.toLowerCase() : null;
+    const emailVerified = profile.email_verified ? 1 : 0;
+    const firstName = (profile.given_name || "").trim() || null;
+    const lastName = (profile.family_name || "").trim() || null;
+    const displayName =
+      (profile.name || "").trim() ||
+      (firstName && lastName ? `${firstName} ${lastName}` : null) ||
+      email ||
+      `Member ${sub.slice(-6)}`;
+
+    const now = nowIso();
+    const identity = db
+      .prepare(
+        "SELECT * FROM auth_identities WHERE provider = ? AND provider_user_id = ? LIMIT 1"
+      )
+      .get("google", sub);
+
+    let user = null;
+    if (identity) {
+      user = db.prepare("SELECT * FROM users WHERE id = ?").get(identity.user_id);
+    }
+
+    if (!user && email) {
+      user = db
+        .prepare("SELECT * FROM users WHERE email = ? LIMIT 1")
+        .get(email);
+    }
+
+    if (!user) {
+      const insert = db.prepare(
+        `INSERT INTO users (display_name, first_name, last_name, email, email_verified, photo_url, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      );
+      const info = insert.run(
+        displayName,
+        firstName,
+        lastName,
+        email,
+        email ? emailVerified : 0,
+        profile.picture || null,
+        now,
+        now
+      );
+      user = db
+        .prepare("SELECT * FROM users WHERE id = ?")
+        .get(info.lastInsertRowid);
+    } else {
+      const updateStmt = db.prepare(
+        `UPDATE users
+         SET display_name = COALESCE(?, display_name),
+             first_name   = COALESCE(?, first_name),
+             last_name    = COALESCE(?, last_name),
+             email        = COALESCE(?, email),
+             email_verified = CASE WHEN ? IS NOT NULL THEN ? ELSE email_verified END,
+             photo_url    = COALESCE(?, photo_url),
+             updated_at   = ?
+         WHERE id = ?`
+      );
+      updateStmt.run(
+        displayName,
+        firstName,
+        lastName,
+        email,
+        email ? emailVerified : null,
+        email ? emailVerified : null,
+        profile.picture || null,
+        now,
+        user.id
+      );
+      user = db.prepare("SELECT * FROM users WHERE id = ?").get(user.id);
+    }
+
+    db.prepare(
+      `INSERT INTO auth_identities (user_id, provider, provider_user_id, email, email_verified, raw_profile_json, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(provider, provider_user_id) DO UPDATE SET
+         user_id = excluded.user_id,
+         email = excluded.email,
+         email_verified = excluded.email_verified,
+         raw_profile_json = excluded.raw_profile_json,
+         updated_at = excluded.updated_at`
+    ).run(
+      user.id,
+      "google",
+      sub,
+      email,
+      email ? emailVerified : 0,
+      JSON.stringify(profile),
+      now,
+      now
+    );
+
+    const next = req.session.oauthNext || "/";
+    let origin = req.session.oauthReturnOrigin || baseUrlFromReq(req);
+    cleanup();
+
+    req.session.user = {
+      id: user.id,
+      displayName: user.display_name || displayName,
+      email: user.email || email,
+    };
+    let target = next;
+    if (origin && typeof origin === "string" && /^https?:\/\//i.test(origin)) {
+      target = `${origin.replace(/\/+$/, "")}${next}`;
+    }
+    res.redirect(target);
+  } catch (err) {
+    console.error("Google OAuth callback failed:", err);
+    cleanup();
+    res.redirect("/?authError=google_oauth_exception");
+  }
 });
 
 // ---------- Existing local auth (kept as-is) ----------
@@ -318,9 +696,15 @@ app.get("/api/questions_book", (req, res) => {
     const total = Number(totalRow?.c || 0);
 
     const rows = db.prepare(
-      `SELECT qb.id, qb.question, qb.posted_by, qb.background, qb.date,
-             (SELECT COUNT(*) FROM question_upvotes qu WHERE qu.question_id = qb.id) AS upvotes
+      `SELECT qb.id,
+              qb.question,
+              COALESCE(u.display_name, qb.posted_by) AS posted_by,
+              qb.background,
+              qb.date,
+              qb.user_id,
+              (SELECT COUNT(*) FROM question_upvotes qu WHERE qu.question_id = qb.id) AS upvotes
        FROM questions_book qb
+       LEFT JOIN users u ON u.id = qb.user_id
        ORDER BY datetime(qb.date) DESC, qb.id DESC
        LIMIT ? OFFSET ?`
     ).all(limit, offset);
@@ -340,24 +724,42 @@ app.post("/api/questions_book", (req, res) => {
   if (!me) return; // 401 handled in requireUser
 
   const qText = (req.body?.question || "").trim();
-  const background = (req.body?.background || null);
+  const backgroundRaw = typeof req.body?.background === "string" ? req.body.background.trim() : "";
+  const background = backgroundRaw ? backgroundRaw : null;
   if (!qText || qText.length < 3) {
     return res.status(400).json({ error: "question_min_3" });
   }
 
   try {
+    const userRow = db
+      .prepare("SELECT id, display_name, first_name, last_name FROM users WHERE id = ?")
+      .get(me.id);
+    const displayName =
+      userRow?.display_name ||
+      [userRow?.first_name, userRow?.last_name].filter(Boolean).join(" ").trim() ||
+      me.displayName ||
+      me.display_name ||
+      `user:${me.id}`;
+
     const info = db
       .prepare(
-        `INSERT INTO questions_book (question, posted_by, background, date, upvotes)
-         VALUES (?, ?, ?, ?, 0)`
+        `INSERT INTO questions_book (question, posted_by, background, date, upvotes, user_id)
+         VALUES (?, ?, ?, ?, 0, ?)`
       )
-      .run(qText, me.displayName || me.display_name || `user:${me.id}`, background, nowIso());
+      .run(qText, displayName, background, nowIso(), me.id);
 
     const row = db
       .prepare(
-        `SELECT qb.id, qb.question, qb.posted_by, qb.background, qb.date,
-               (SELECT COUNT(*) FROM question_upvotes qu WHERE qu.question_id = qb.id) AS upvotes
-         FROM questions_book qb WHERE qb.id = ?`
+        `SELECT qb.id,
+                qb.question,
+                COALESCE(u.display_name, qb.posted_by) AS posted_by,
+                qb.background,
+                qb.date,
+                qb.user_id,
+                (SELECT COUNT(*) FROM question_upvotes qu WHERE qu.question_id = qb.id) AS upvotes
+         FROM questions_book qb
+         LEFT JOIN users u ON u.id = qb.user_id
+         WHERE qb.id = ?`
       )
       .get(info.lastInsertRowid);
 
@@ -805,6 +1207,89 @@ app.post("/api/answers/:id/vote", (req, res) => {
   }
 });
 
+app.post("/api/signup/complete", (req, res) => {
+  const me = requireUser(req, res);
+  if (!me) return;
+
+  const answer = (req.body?.answer || "").trim();
+  const firstName = (req.body?.firstName || "").trim();
+  const lastName = (req.body?.lastName || "").trim();
+  const city = (req.body?.city || "").trim();
+
+  if (!answer || answer.length < 10) {
+    return res.status(400).json({ error: "answer_min_10" });
+  }
+
+  if (firstName || lastName || city) {
+    const sets = [];
+    const vals = [];
+    if (firstName) {
+      sets.push("first_name = ?");
+      vals.push(firstName);
+    }
+    if (lastName) {
+      sets.push("last_name = ?");
+      vals.push(lastName);
+    }
+    if (city) {
+      sets.push("city = ?");
+      vals.push(city);
+    }
+    if (sets.length) {
+      try {
+        db.prepare(`UPDATE users SET ${sets.join(", ")} WHERE id = ?`).run(
+          ...vals,
+          me.id
+        );
+      } catch (e) {
+        console.error("Failed to update user profile fields on signup:", e);
+      }
+    }
+  }
+
+  Signup.saveOnboardingAnswer({
+    userId: me.id,
+    token: null,
+    promptKey: "most_interesting_question",
+    answer,
+    createdAt: nowIso(),
+  });
+
+  try {
+    const now = nowIso();
+    const userRow = db
+      .prepare("SELECT id, display_name, first_name, last_name FROM users WHERE id = ?")
+      .get(me.id);
+    const displayName =
+      userRow?.display_name ||
+      [userRow?.first_name, userRow?.last_name].filter(Boolean).join(" ").trim() ||
+      me.displayName ||
+      `user:${me.id}`;
+
+    const existing = db
+      .prepare("SELECT id FROM questions_book WHERE user_id = ? AND question = ? LIMIT 1")
+      .get(me.id, answer);
+
+    if (!existing) {
+      db.prepare(
+        `INSERT INTO questions_book (question, posted_by, background, date, upvotes, user_id)
+         VALUES (?, ?, ?, ?, 0, ?)`
+      ).run(answer, displayName, null, now, me.id);
+    } else {
+      db.prepare(
+        `UPDATE questions_book
+         SET posted_by = COALESCE(?, posted_by),
+             user_id = COALESCE(?, user_id)
+         WHERE id = ?`
+      ).run(displayName, me.id, existing.id);
+    }
+  } catch (e) {
+    console.error("Failed to persist signup question into questions_book:", e);
+  }
+
+  return res.json({ ok: true });
+});
+
 // Accept invite + store onboarding answer (runs AFTER Google sign-in)
 // Body: { token: string, answer: string }
 app.post("/api/invite/accept", (req, res) => {
@@ -815,7 +1300,8 @@ app.post("/api/invite/accept", (req, res) => {
   if (!token || typeof token !== "string") {
     return res.status(400).json({ error: "missing_token" });
   }
-  if (!answer || answer.trim().length < 10) {
+  const trimmedAnswer = (answer || "").trim();
+  if (!trimmedAnswer || trimmedAnswer.length < 10) {
     return res.status(400).json({ error: "answer_min_10" });
   }
 
@@ -853,9 +1339,41 @@ app.post("/api/invite/accept", (req, res) => {
     userId: me.id,
     token,
     promptKey: "most_interesting_question",
-    answer: answer.trim(),
+    answer: trimmedAnswer,
     createdAt: nowIso(),
   });
+
+  try {
+    const now = nowIso();
+    const userRow = db
+      .prepare("SELECT id, display_name, first_name, last_name FROM users WHERE id = ?")
+      .get(me.id);
+    const displayName =
+      userRow?.display_name ||
+      [userRow?.first_name, userRow?.last_name].filter(Boolean).join(" ").trim() ||
+      me.displayName ||
+      `user:${me.id}`;
+
+    const existing = db
+      .prepare("SELECT id FROM questions_book WHERE user_id = ? AND question = ? LIMIT 1")
+      .get(me.id, trimmedAnswer);
+
+    if (!existing) {
+      db.prepare(
+        `INSERT INTO questions_book (question, posted_by, background, date, upvotes, user_id)
+         VALUES (?, ?, ?, ?, 0, ?)`
+      ).run(trimmedAnswer, displayName, null, now, me.id);
+    } else {
+      db.prepare(
+        `UPDATE questions_book
+         SET posted_by = COALESCE(?, posted_by),
+             user_id = COALESCE(?, user_id)
+         WHERE id = ?`
+      ).run(displayName, me.id, existing.id);
+    }
+  } catch (e) {
+    console.error("Failed to persist invite question into questions_book:", e);
+  }
 
   // mark invite accepted
   Invites.markAccepted({ token, userId: me.id, acceptedAt: nowIso() });

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
 const PAGE_SIZE = 50;
+const PENDING_SUBMISSION_KEY = "qb:pendingSubmission";
 
 export default function QuestionsBook() {
   const [questions, setQuestions] = useState([]);
@@ -90,7 +91,33 @@ export default function QuestionsBook() {
     return () => window.removeEventListener("keydown", onKey);
   }, [authModalOpen]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.sessionStorage.getItem(PENDING_SUBMISSION_KEY);
+      if (!raw) return;
+      window.sessionStorage.removeItem(PENDING_SUBMISSION_KEY);
+      const parsed = JSON.parse(raw);
+      if (
+        parsed &&
+        typeof parsed === "object" &&
+        parsed.intent === "questions_submit" &&
+        !(dialogRef.current && dialogRef.current.open)
+      ) {
+        openDialog({
+          question: parsed.question ?? "",
+          background: parsed.background ?? "",
+        });
+      }
+    } catch (err) {
+      console.warn("QuestionsBook: failed to restore pending submission", err);
+    }
+  }, []);
+
   const openAuthModal = () => {
+    if (dialogRef.current?.open && typeof dialogRef.current.close === "function") {
+      dialogRef.current.close();
+    }
     const { origin, pathname, search } = window.location;
     setAuthReturnUrl(`${origin}${pathname}${search}`);
     setAuthModalOpen(true);
@@ -154,9 +181,10 @@ export default function QuestionsBook() {
   const goPrev = () => setPage((p) => Math.max(1, p - 1));
   const goNext = () => setPage((p) => (totalPages ? Math.min(totalPages, p + 1) : p + 1));
 
-  const openDialog = () => {
-    setQText("");
-    setBackground("");
+  const openDialog = (prefill) => {
+    const data = prefill ?? {};
+    setQText(typeof data.question === "string" ? data.question : "");
+    setBackground(typeof data.background === "string" ? data.background : "");
     setSort("recent");
     setCreating(false);
     if (dialogRef.current && dialogRef.current.showModal) {
@@ -167,6 +195,9 @@ export default function QuestionsBook() {
   const closeDialog = () => {
     if (dialogRef.current && dialogRef.current.close) {
       dialogRef.current.close();
+    }
+    if (typeof window !== "undefined") {
+      window.sessionStorage.removeItem(PENDING_SUBMISSION_KEY);
     }
   };
 
@@ -181,8 +212,27 @@ export default function QuestionsBook() {
       const res = await fetch(`/api/questions_book`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ question: qText.trim(), background: background.trim() || undefined }),
       });
+      if (res.status === 401) {
+        if (typeof window !== "undefined") {
+          try {
+            window.sessionStorage.setItem(
+              PENDING_SUBMISSION_KEY,
+              JSON.stringify({
+                intent: "questions_submit",
+                question: qText.trim(),
+                background,
+              })
+            );
+          } catch (storageError) {
+            console.warn("QuestionsBook: unable to persist pending submission", storageError);
+          }
+        }
+        openAuthModal();
+        return;
+      }
       if (!res.ok) {
         const msg = await res.text().catch(() => "");
         throw new Error(`Create failed: ${res.status} ${msg}`);
@@ -613,9 +663,9 @@ export default function QuestionsBook() {
               ✕
             </button>
             <div>
-              <h3 id="auth-modal-title">Join heterodox</h3>
+              <h3 id="auth-modal-title">Join community</h3>
               <p className="muted" style={{ marginTop: 8 }}>
-                Upvoting questions is for members only. Do you already have an account?
+                Only registered members can submit and upvote the questions. Do you already have an account?
               </p>
             </div>
             <div className="actions">
