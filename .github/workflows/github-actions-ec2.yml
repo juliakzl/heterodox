@@ -1,4 +1,4 @@
-name: Deploy to EC2
+name: Deploy goodquestions to EC2
 
 on:
   push:
@@ -9,20 +9,25 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     concurrency:
-      group: heterodox-main
+      group: goodquestions-main
       cancel-in-progress: true
     permissions:
       contents: read
 
     env:
-      REMOTE_HOST: ec2-18-199-237-58.eu-central-1.compute.amazonaws.com
+      # NEW: your current VM
+      REMOTE_HOST: ec2-18-184-17-18.eu-central-1.compute.amazonaws.com
       REMOTE_USER: ubuntu
-      REMOTE_ROOT: /home/ubuntu/heterodox
-      REMOTE_DATA_DIR: /home/ubuntu/heterodox/data
-      REMOTE_BACKUP_DIR: /home/ubuntu/heterodox/backups
-      REMOTE_SERVICE: heterodox
-      SSH_PORT: "22"         # <-- SSH port for rsync/ssh
-      API_PORT: "4000"       # <-- your Node app port (do NOT name this REMOTE_PORT)
+
+      # NEW: folder layout on the VM for this project
+      REMOTE_ROOT: /home/ubuntu/goodquestions
+      REMOTE_DATA_DIR: /var/lib/goodquestions
+      REMOTE_BACKUP_DIR: /var/backups/goodquestions
+
+      # NEW: systemd service & API port for this app
+      REMOTE_SERVICE: goodquestions
+      SSH_PORT: "22"
+      API_PORT: "3001"
 
     steps:
       - name: Checkout
@@ -54,10 +59,10 @@ jobs:
           envs: REMOTE_ROOT,REMOTE_DATA_DIR,REMOTE_BACKUP_DIR
           script: |
             set -euo pipefail
+            sudo mkdir -p "$REMOTE_DATA_DIR" "$REMOTE_BACKUP_DIR"
+            sudo chown -R "$USER":"$USER" "$REMOTE_DATA_DIR" "$REMOTE_BACKUP_DIR"
             mkdir -p "$REMOTE_ROOT/client/dist"
             mkdir -p "$REMOTE_ROOT/server"
-            mkdir -p "$REMOTE_DATA_DIR"
-            mkdir -p "$REMOTE_BACKUP_DIR"
 
       - name: Deploy client build (rsync over SSH:22)
         uses: easingthemes/ssh-deploy@v5.1.0
@@ -65,32 +70,30 @@ jobs:
           SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
           REMOTE_HOST:      ${{ env.REMOTE_HOST }}
           REMOTE_USER:      ${{ env.REMOTE_USER }}
-          REMOTE_PORT:      ${{ env.SSH_PORT }}    # <-- force SSH port 22
+          REMOTE_PORT:      ${{ env.SSH_PORT }}
           ARGS:             "-avzr --delete"
           SOURCE:           "client/dist/"
           TARGET:           "${{ env.REMOTE_ROOT }}/client/dist"
 
-      # --- OPTIONAL: deploy backend code as well ---
-      - name: Deploy server code (optional)
-        if: ${{ vars.DEPLOY_SERVER == 'true' }}
+      # Deploy backend code (keeps secrets/DB on VM)
+      - name: Deploy server code
         uses: easingthemes/ssh-deploy@v5.1.0
         env:
           SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
           REMOTE_HOST:      ${{ env.REMOTE_HOST }}
           REMOTE_USER:      ${{ env.REMOTE_USER }}
-          REMOTE_PORT:      ${{ env.SSH_PORT }}    # <-- force SSH port 22
-          # Protect secrets/DB on VM; we WANT migrations/ to ship
+          REMOTE_PORT:      ${{ env.SSH_PORT }}
           ARGS: >-
             -avzr --delete
             --exclude='.git'
             --exclude='node_modules'
             --exclude='.env'
-            --exclude='asa.db'
+            --exclude='*.sqlite'
             --exclude='data/'
           SOURCE:           "server/"
           TARGET:           "${{ env.REMOTE_ROOT }}/server"
 
-      - name: Post-deploy (migrate + restart backend if deployed; reload Caddy)
+      - name: Post-deploy (install deps, optional migrate, restart; reload Caddy)
         uses: appleboy/ssh-action@v1.2.2
         with:
           host:     ${{ env.REMOTE_HOST }}
@@ -99,61 +102,47 @@ jobs:
           envs: REMOTE_ROOT,REMOTE_DATA_DIR,REMOTE_BACKUP_DIR,REMOTE_SERVICE,API_PORT
           script: |
             set -euo pipefail
+            cd "$REMOTE_ROOT/server"
+            NODE_ENV=production npm ci --omit=dev --no-audit --no-fund
 
-            if [ "${{ vars.DEPLOY_SERVER }}" = "true" ]; then
-              cd "$REMOTE_ROOT/server"
-              NODE_ENV=production npm ci --omit=dev --no-audit --no-fund
+            # Use dedicated prod DB path on VM
+            export DB_PATH="${REMOTE_DATA_DIR}/prod.sqlite"
+            mkdir -p "${REMOTE_DATA_DIR}" "${REMOTE_BACKUP_DIR}"
 
-              # Use a dedicated data dir for the DB
-              export DB_PATH="${REMOTE_DATA_DIR}/asa.db"
-              mkdir -p "${REMOTE_DATA_DIR}" "${REMOTE_BACKUP_DIR}"
-
-              # If an old DB exists under server/, move it once to data/
-              if [ -f "$REMOTE_ROOT/server/asa.db" ] && [ ! -f "$DB_PATH" ]; then
-                echo "Found legacy DB at server/asa.db. Moving to data/..."
-                mv "$REMOTE_ROOT/server/asa.db" "$DB_PATH"
-              fi
-
-              # Backup if present
-              if [ -f "$DB_PATH" ]; then
-                ts=$(date -u +%Y%m%d_%H%M%S)
-                cp -a "$DB_PATH" "${REMOTE_BACKUP_DIR}/asa.db.${ts}.sqlite"
-                echo "Backed up DB to ${REMOTE_BACKUP_DIR}/asa.db.${ts}.sqlite"
-              fi
-
-              echo "=== Sanity: which migrate.js do we have? ==="
-              ls -l "$REMOTE_ROOT/server/migrate.js" || true
-              head -n 5 "$REMOTE_ROOT/server/migrate.js" || true
-
-              echo "=== Migration status (before) ==="
-              env DB_PATH="$DB_PATH" MIGRATIONS_DIR="$REMOTE_ROOT/server/migrations" node ./migrate.js --status || true
-
-              env DB_PATH="$DB_PATH" MIGRATIONS_DIR="$REMOTE_ROOT/server/migrations" node ./migrate.js
-
-              sudo systemctl restart "$REMOTE_SERVICE"
-
-              # Wait up to 60s for API to be healthy on API_PORT
-              for i in $(seq 1 60); do
-                if sudo ss -ltnp | grep -q ":${API_PORT}"; then
-                  code=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 "http://127.0.0.1:${API_PORT}/" || true)
-                  if echo "$code" | grep -Eq '^(200|30[12]|401)$'; then
-                    echo "Backend healthy (HTTP $code)"
-                    break
-                  fi
-                fi
-                if [ "$i" -eq 60 ]; then
-                  echo "Backend did not become healthy. Recent logs:"
-                  sudo systemctl status "$REMOTE_SERVICE" --no-pager || true
-                  sudo journalctl -u "$REMOTE_SERVICE" -n 200 --no-pager || true
-                  exit 1
-                fi
-                sleep 1
-              done
-
-              echo "=== Migration status (after) ==="
-              env DB_PATH="$DB_PATH" MIGRATIONS_DIR="$REMOTE_ROOT/server/migrations" node ./migrate.js --status || true
+            # One-time migrate old DB if it exists under server/
+            if [ -f "$REMOTE_ROOT/server/asa.db" ] && [ ! -f "$DB_PATH" ]; then
+              echo "Moving legacy DB server/asa.db to ${DB_PATH}..."
+              mv "$REMOTE_ROOT/server/asa.db" "$DB_PATH"
             fi
 
+            # Backup if DB exists
+            if [ -f "$DB_PATH" ]; then
+              ts=$(date -u +%Y%m%d_%H%M%S)
+              cp -a "$DB_PATH" "${REMOTE_BACKUP_DIR}/prod.${ts}.sqlite"
+              echo "Backed up DB to ${REMOTE_BACKUP_DIR}/prod.${ts}.sqlite"
+            fi
+
+            # Run migrations if your repo has them (safe to skip if not present)
+            if [ -f "./migrate.js" ]; then
+              env DB_PATH="$DB_PATH" MIGRATIONS_DIR="$REMOTE_ROOT/server/migrations" node ./migrate.js || true
+            fi
+
+            sudo systemctl restart "$REMOTE_SERVICE"
+
+            # Health check
+            for i in $(seq 1 60); do
+              if sudo ss -ltnp | grep -q ":${API_PORT}"; then
+                code=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 2 "http://127.0.0.1:${API_PORT}/" || true)
+                if echo "$code" | grep -Eq '^(200|30[12]|401)$'; then
+                  echo "Backend healthy (HTTP $code)"; break
+                fi
+              fi
+              [ "$i" -eq 60 ] && { echo "Backend not healthy"; sudo journalctl -u "$REMOTE_SERVICE" -n 200 --no-pager || true; exit 1; }
+              sleep 1
+            done
+
+            # Reload Caddy (if present)
             sudo systemctl reload caddy || true
+
             echo "${{ github.sha }}" | sudo tee "${REMOTE_ROOT}/.deployed_sha" >/dev/null
             date -u | sudo tee "${REMOTE_ROOT}/.deployed_at" >/dev/null
