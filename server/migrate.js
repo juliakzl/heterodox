@@ -82,12 +82,24 @@ function ensureBootstrap(db) {
     posted_by TEXT,
     asked_by TEXT,
     date TEXT NOT NULL DEFAULT (datetime('now')),
-    upvotes INTEGER NOT NULL DEFAULT 0
+    upvotes INTEGER NOT NULL DEFAULT 0,
+    hidden INTEGER NOT NULL DEFAULT 0
   );
   CREATE INDEX IF NOT EXISTS idx_questions_book_date ON questions_book(date);
   CREATE INDEX IF NOT EXISTS idx_questions_book_upvotes ON questions_book(upvotes);
   `;
   db.exec(questionsBookSql);
+  // Ensure `hidden` column exists even if questions_book predated it
+  try {
+    const qbCols = db.prepare("PRAGMA table_info(questions_book)").all().map(r => r.name);
+    if (!qbCols.includes("hidden")) {
+      db.prepare("ALTER TABLE questions_book ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0").run();
+    }
+    db.exec("CREATE INDEX IF NOT EXISTS idx_questions_book_hidden ON questions_book(hidden);");
+  } catch (e) {
+    // log but don't crash bootstrap; subsequent migrations may handle it
+    try { console.warn("ensureBootstrap: hidden column check failed:", e.message); } catch {}
+  }
 
   // Upvotes table: one row per (question_id, user_id)
   const upvotesSql = `
@@ -103,6 +115,22 @@ function ensureBootstrap(db) {
   CREATE INDEX IF NOT EXISTS idx_question_upvotes_created ON question_upvotes(created_at);
   `;
   db.exec(upvotesSql);
+
+  // Comments table for questions_book
+  const commentsSql = `
+  CREATE TABLE IF NOT EXISTS comments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    question_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    comment TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    FOREIGN KEY(question_id) REFERENCES questions_book(id),
+    FOREIGN KEY(user_id) REFERENCES users(id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_comments_question ON comments(question_id);
+  CREATE INDEX IF NOT EXISTS idx_comments_user ON comments(user_id);
+  `;
+  db.exec(commentsSql);
 
   // Defensive column adds on users table
   try {

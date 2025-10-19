@@ -789,6 +789,7 @@ app.post("/api/questions_book", (req, res) => {
   }
 });
 
+
 // POST /questions_book/:id/upvote -> { id, upvotes }
 app.post("/api/questions_book/:id/upvote", (req, res) => {
   const me = requireUser(req, res);
@@ -818,6 +819,86 @@ app.post("/api/questions_book/:id/upvote", (req, res) => {
     return res.json(out);
   } catch (e) {
     console.error("/api/questions_book/:id/upvote failed:", e);
+    return res.status(500).json({ error: "server_error" });
+  }
+});
+
+app.post("/api/questions_book/:id/comment", (req, res) => {
+  const me = requireUser(req, res);
+  if (!me) return;
+
+  try {
+    const qid = parseInt(String(req.params.id), 10);
+    if (!qid || Number.isNaN(qid)) return res.status(400).json({ error: "invalid_id" });
+
+    const text = (req.body?.comment || "").trim();
+    if (!text || text.length < 1) return res.status(400).json({ error: "comment_required" });
+
+    // Ensure question exists
+    const qExists = db.prepare("SELECT 1 FROM questions_book WHERE id = ?").get(qid);
+    if (!qExists) return res.status(404).json({ error: "question_not_found" });
+
+    const now = nowIso();
+    const info = db
+      .prepare(
+        "INSERT INTO comments (question_id, user_id, comment, created_at) VALUES (?, ?, ?, ?)"
+      )
+      .run(qid, me.id, text, now);
+
+    const row = db
+      .prepare(
+        `SELECT c.id, c.question_id, c.user_id, c.comment, c.created_at,
+                u.display_name AS user_name
+         FROM comments c
+         JOIN users u ON u.id = c.user_id
+         WHERE c.id = ?`
+      )
+      .get(info.lastInsertRowid);
+
+    return res.status(201).json(row);
+  } catch (e) {
+    console.error("POST /api/questions_book/:id/comment failed:", e);
+    return res.status(500).json({ error: "server_error" });
+  }
+});
+
+app.get("/api/get/questions_book/:id/comments", (req, res) => {
+  try {
+    const qid = parseInt(String(req.params.id), 10);
+    if (!qid || Number.isNaN(qid)) return res.status(400).json({ error: "invalid_id" });
+
+    // Optional: ensure question exists
+    const qExists = db.prepare("SELECT 1 FROM questions_book WHERE id = ?").get(qid);
+    if (!qExists) return res.status(404).json({ error: "question_not_found" });
+
+    const page = Math.max(parseInt(String(req.query.page || "1"), 10) || 1, 1);
+    const limitRaw = parseInt(String(req.query.limit || "50"), 10) || 50;
+    const limit = Math.max(1, Math.min(100, limitRaw));
+    const offset = (page - 1) * limit;
+
+    const totalRow = db.prepare("SELECT COUNT(*) AS c FROM comments WHERE question_id = ?").get(qid);
+    const total = Number(totalRow?.c || 0);
+
+    const rows = db
+      .prepare(
+        `SELECT c.id,
+                c.question_id,
+                c.user_id,
+                c.comment,
+                c.created_at,
+                u.display_name AS user_name
+         FROM comments c
+         JOIN users u ON u.id = c.user_id
+         WHERE c.question_id = ?
+         ORDER BY datetime(c.created_at) ASC, c.id ASC
+         LIMIT ? OFFSET ?`
+      )
+      .all(qid, limit, offset);
+
+    res.setHeader("Cache-Control", "no-store");
+    return res.json({ data: rows, total });
+  } catch (e) {
+    console.error("GET /api/get/questions_book/:id/comments failed:", e);
     return res.status(500).json({ error: "server_error" });
   }
 });

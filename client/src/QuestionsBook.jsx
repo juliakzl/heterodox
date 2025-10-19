@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 
 const PAGE_SIZE = 50;
 const PENDING_SUBMISSION_KEY = "qb:pendingSubmission";
+const PENDING_COMMENT_KEY = "qb:pendingComment";
 
 export default function QuestionsBook() {
   const [questions, setQuestions] = useState([]);
@@ -19,6 +20,15 @@ export default function QuestionsBook() {
   const [qText, setQText] = useState("");
   const [background, setBackground] = useState("");
   const dialogRef = useRef(null);
+  const commentDialogRef = useRef(null);
+  const [commentText, setCommentText] = useState("");
+  const [commentCreating, setCommentCreating] = useState(false);
+  const [commentTargetId, setCommentTargetId] = useState(null);
+
+  // Comments state per question
+  const [commentsMap, setCommentsMap] = useState({}); // { [qid]: { data: Array, total: number } }
+  const [commentsLoading, setCommentsLoading] = useState({}); // { [qid]: boolean }
+  const [openComments, setOpenComments] = useState({}); // { [qid]: boolean }
 
   const totalPages = useMemo(() => {
     if (total == null) return null; // unknown
@@ -114,6 +124,22 @@ export default function QuestionsBook() {
     }
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.sessionStorage.getItem(PENDING_COMMENT_KEY);
+      if (!raw) return;
+      window.sessionStorage.removeItem(PENDING_COMMENT_KEY);
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object" && parsed.id) {
+        // Open comment modal for the stored question id
+        openCommentModal({ id: parsed.id, _id: parsed.id });
+      }
+    } catch (err) {
+      console.warn("QuestionsBook: failed to restore pending comment", err);
+    }
+  }, []);
+
   const openAuthModal = () => {
     if (dialogRef.current?.open && typeof dialogRef.current.close === "function") {
       dialogRef.current.close();
@@ -173,6 +199,118 @@ export default function QuestionsBook() {
       alert(e.message || "Failed to upvote");
     } finally {
       setUpvoting((u) => ({ ...u, [id]: false }));
+    }
+  };
+
+  // ----- Comment modal helpers -----
+  const openCommentModal = (q) => {
+    const id = q?.id ?? q?._id;
+    if (!id) return;
+    setCommentTargetId(id);
+    setCommentText("");
+    if (commentDialogRef.current && commentDialogRef.current.showModal) {
+      commentDialogRef.current.showModal();
+    }
+  };
+
+  const closeCommentModal = () => {
+    if (commentDialogRef.current && commentDialogRef.current.close) {
+      commentDialogRef.current.close();
+    }
+    setCommentText("");
+    setCommentTargetId(null);
+  };
+
+  const fetchCommentsFor = async (qid) => {
+    if (!qid) return;
+    setCommentsLoading((m) => ({ ...m, [qid]: true }));
+    try {
+      const res = await fetch(`/api/get/questions_book/${qid}/comments?limit=50`);
+      if (!res.ok) throw new Error(`Load comments failed: ${res.status}`);
+      const json = await res.json();
+      const data = Array.isArray(json?.data) ? json.data : [];
+      const total = Number(json?.total ?? data.length) || 0;
+      setCommentsMap((m) => ({ ...m, [qid]: { data, total } }));
+    } catch (e) {
+      console.warn(`Failed to load comments for ${qid}:`, e);
+      setCommentsMap((m) => ({ ...m, [qid]: { data: [], total: 0, error: e.message || String(e) } }));
+    } finally {
+      setCommentsLoading((m) => ({ ...m, [qid]: false }));
+    }
+  };
+
+  const toggleComments = async (qid) => {
+    setOpenComments((m) => ({ ...m, [qid]: !m[qid] }));
+    const opened = !openComments[qid];
+    if (opened && !commentsMap[qid]) {
+      await fetchCommentsFor(qid);
+    }
+  };
+
+  const submitComment = async (e) => {
+    e.preventDefault();
+    const id = commentTargetId;
+    const text = commentText.trim();
+    if (!id || !text) {
+      alert("Please write a comment.");
+      return;
+    }
+    try {
+      setCommentCreating(true);
+      const res = await fetch(`/api/questions_book/${id}/comment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ comment: text })
+      });
+      if (res.status === 401) {
+        setCommentCreating(false);
+        // Remember intent to reopen after auth
+        if (typeof window !== "undefined") {
+          try {
+            window.sessionStorage.setItem(PENDING_COMMENT_KEY, JSON.stringify({ id }));
+          } catch {}
+        }
+        // Ensure only one modal is visible
+        closeCommentModal();
+        openAuthModal();
+        return;
+      }
+      if (!res.ok) throw new Error(`Comment failed: ${res.status}`);
+      await res.json().catch(() => null);
+      closeCommentModal();
+      alert("Comment added!");
+    } catch (err) {
+      alert(err.message || "Failed to add comment");
+    } finally {
+      setCommentCreating(false);
+    }
+  };
+
+  const handleAddComment = async (q) => {
+    const id = q?.id ?? q?._id;
+    if (!id) return;
+    try {
+      // Try a no-op submit to let the server tell us if we are authed
+      const res = await fetch(`/api/questions_book/${id}/comment`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ comment: "" }) // will 400 if authed, 401 if not
+      });
+      if (res.status === 401) {
+        // Persist intent and show login modal
+        if (typeof window !== "undefined") {
+          try { window.sessionStorage.setItem(PENDING_COMMENT_KEY, JSON.stringify({ id })); } catch {}
+        }
+        openAuthModal();
+        return;
+      }
+      // Authenticated (likely 400 comment_required) -> open the modal now
+      openCommentModal(q);
+    } catch (e) {
+      // Network or other issue: fallback to opening the modal
+      openCommentModal(q);
     }
   };
 
@@ -586,6 +724,29 @@ export default function QuestionsBook() {
         </form>
       </dialog>
 
+      <dialog ref={commentDialogRef}>
+        <form onSubmit={submitComment} method="dialog">
+          <h3>Add comment</h3>
+          <div>
+            <label>
+              Comment
+              <br />
+              <textarea
+                value={commentText}
+                onChange={(e) => setCommentText(e.target.value)}
+                rows={4}
+                required
+                placeholder="Write your comment…"
+              />
+            </label>
+          </div>
+          <div className="actions">
+            <button type="button" className="btn" onClick={closeCommentModal} disabled={commentCreating}>Cancel</button>
+            <button type="submit" className="btn" disabled={commentCreating}>{commentCreating ? "Submitting…" : "Submit"}</button>
+          </div>
+        </form>
+      </dialog>
+
       {error && (
         <div>⚠️ {error}</div>
       )}
@@ -595,42 +756,95 @@ export default function QuestionsBook() {
       ) : (
         <>
           <ul>
-            {questions.map((q) => { const id = q.id ?? q._id; const bgText = String(q.background ?? q.asked_by ?? q.askedBy ?? ""); return (
-              <li key={id} className="question-card">
-                <div className="row">
-                  <div className="question-text">{q.question}</div>
-                  <button
-                    className="vote-btn"
-                    onClick={() => handleUpvote(q)}
-                    disabled={!!upvoting[id] || q.has_upvoted === 1 || q.has_upvoted === true}
-                    aria-label="Upvote question"
-                  >
-                    <span className="icon" aria-hidden="true">▲</span>
-                    <span className="count">{q.upvotes ?? 0}</span>
-                  </button>
-                </div>
-                <div className="meta">
-                  <span><strong>Posted by:</strong> {q.posted_by ?? q.postedBy ?? "—"}</span>
-                  {bgText.trim() ? (
+            {questions.map((q) => {
+              const id = q.id ?? q._id;
+              const bgText = String(q.background ?? q.asked_by ?? q.askedBy ?? "");
+              const commentsCount = Number(q.comments_total ?? commentsMap[id]?.total ?? 0);
+              return (
+                <li key={id} className="question-card">
+                  <div className="row">
+                    <div className="question-text">{q.question}</div>
                     <button
-                      type="button"
-                      className="bg-toggle"
-                      onClick={() => toggleBg(id)}
-                      aria-expanded={!!openBg[id]}
-                      aria-controls={`bg-${id}`}
+                      className="vote-btn"
+                      onClick={() => handleUpvote(q)}
+                      disabled={!!upvoting[id] || q.has_upvoted === 1 || q.has_upvoted === true}
+                      aria-label="Upvote question"
                     >
-                      {openBg[id] ? "Question's story" : "Question's story"}
+                      <span className="icon" aria-hidden="true">▲</span>
+                      <span className="count">{q.upvotes ?? 0}</span>
                     </button>
-                  ) : null}
-                  <span title={q.date}>{formatDate(q.date)}</span>
-                </div>
-                {bgText.trim() && openBg[id] && (
-                  <div id={`bg-${id}`} className="background-panel">
-                    {bgText}
                   </div>
-                )}
-              </li>
-            )})}
+                  <div className="meta">
+                    {/* First line: toggles */}
+                    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', width: '100%' }}>
+                      {bgText.trim() ? (
+                        <button
+                          type="button"
+                          className="bg-toggle"
+                          onClick={() => toggleBg(id)}
+                          aria-expanded={!!openBg[id]}
+                          aria-controls={`bg-${id}`}
+                        >
+                          {openBg[id] ? "Question's story" : "Question's story"}
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        className="bg-toggle"
+                        onClick={() => toggleComments(id)}
+                        aria-expanded={!!openComments[id]}
+                        aria-controls={`comments-${id}`}
+                      >
+                        {openComments[id] ? "Comments" : `Comments (${commentsCount})`}
+                      </button>
+                    </div>
+
+                    {/* Second line: posted by + date */}
+                    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', width: '100%' }}>
+                      <span><strong>Posted by:</strong> {q.posted_by ?? q.postedBy ?? "—"}</span>
+                      <span title={q.date}>{formatDate(q.date)}</span>
+                    </div>
+                  </div>
+
+                  {bgText.trim() && openBg[id] && (
+                    <div id={`bg-${id}`} className="background-panel">
+                      {bgText}
+                    </div>
+                  )}
+
+                  {openComments[id] && (
+                    <div id={`comments-${id}`} className="background-panel">
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                        <button
+                          type="button"
+                          className="btn"
+                          onClick={() => handleAddComment({ id })}
+                          aria-label="Add comment"
+                        >
+                          Add comment
+                        </button>
+                      </div>
+                      {commentsLoading[id] ? (
+                        <div>Loading comments…</div>
+                      ) : (commentsMap[id]?.data?.length ? (
+                        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: '10px' }}>
+                          {commentsMap[id].data.map((c) => (
+                            <li key={c.id} style={{borderTop: '1px dashed var(--border)', paddingTop: 8}}>
+                              <div style={{fontSize: '0.95rem'}}>{c.comment}</div>
+                              <div className="muted" style={{fontSize: '0.85rem', marginTop: 4}}>
+                                — {c.user_name || `User #${c.user_id}`} • {formatDate(c.created_at)}
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <div className="muted">No comments yet.</div>
+                      ))}
+                    </div>
+                  )}
+                </li>
+              );
+            })}
           </ul>
 
           <div className="pager">
@@ -675,7 +889,7 @@ export default function QuestionsBook() {
             <div>
               <h3 id="auth-modal-title">Join community</h3>
               <p className="muted" style={{ marginTop: 8 }}>
-                Only registered members can submit and upvote the questions. Do you already have an account?
+                You first need to log in or sign up to submit comments or upvote questions.
               </p>
             </div>
             <div className="actions">
