@@ -20,6 +20,7 @@ const GOOGLE_CLIENT_SECRET = (process.env.GOOGLE_CLIENT_SECRET || "").trim();
 const GOOGLE_SCOPES =
   (process.env.GOOGLE_AUTH_SCOPES || "openid email profile").trim();
 const CLIENT_BASE_URL = (process.env.CLIENT_BASE_URL || "").trim();
+const ADMIN_API_SECRET = (process.env.ADMIN_API_SECRET || "").trim();
 
 app.set("trust proxy", 1); // important behind nginx/https
 
@@ -148,6 +149,23 @@ function ensureQuestionsBookColumns() {
 }
 
 ensureQuestionsBookColumns();
+
+function requireAdmin(req, res) {
+  if (!ADMIN_API_SECRET) {
+    res.status(503).json({ error: "admin_api_disabled" });
+    return false;
+  }
+  const provided =
+    req.headers["x-admin-secret"] ||
+    req.headers["x-admin-key"] ||
+    req.query.admin_secret ||
+    req.query.admin_key;
+  if (!provided || String(provided) !== ADMIN_API_SECRET) {
+    res.status(403).json({ error: "admin_forbidden" });
+    return false;
+  }
+  return true;
+}
 
 // ---------- Weekly Rounds (global weekly question) ----------
 db.exec(`
@@ -692,7 +710,7 @@ app.get("/api/questions_book", (req, res) => {
     const limit = Math.max(1, Math.min(50, limitRaw)); // cap at 50 as requested
     const offset = (page - 1) * limit;
 
-    const totalRow = db.prepare("SELECT COUNT(*) as c FROM questions_book").get();
+    const totalRow = db.prepare("SELECT COUNT(*) as c FROM questions_book WHERE COALESCE(hidden, 0) = 0").get();
     const total = Number(totalRow?.c || 0);
 
     const rows = db.prepare(
@@ -705,6 +723,7 @@ app.get("/api/questions_book", (req, res) => {
               (SELECT COUNT(*) FROM question_upvotes qu WHERE qu.question_id = qb.id) AS upvotes
        FROM questions_book qb
        LEFT JOIN users u ON u.id = qb.user_id
+       WHERE COALESCE(qb.hidden, 0) = 0
        ORDER BY datetime(qb.date) DESC, qb.id DESC
        LIMIT ? OFFSET ?`
     ).all(limit, offset);
@@ -800,6 +819,141 @@ app.post("/api/questions_book/:id/upvote", (req, res) => {
   } catch (e) {
     console.error("/api/questions_book/:id/upvote failed:", e);
     return res.status(500).json({ error: "server_error" });
+  }
+});
+
+// ---------- Admin endpoints ----------
+app.patch("/api/admin/questions_book/:id", (req, res) => {
+  if (!requireAdmin(req, res)) return;
+
+  const id = parseInt(String(req.params.id), 10);
+  if (!id || Number.isNaN(id)) {
+    return res.status(400).json({ error: "invalid_id" });
+  }
+
+  const payload = req.body || {};
+  const sets = [];
+  const vals = [];
+
+  if (typeof payload.question === "string") {
+    const trimmed = payload.question.trim();
+    if (!trimmed) return res.status(400).json({ error: "question_required" });
+    sets.push("question = ?");
+    vals.push(trimmed);
+  }
+
+  if (payload.background !== undefined) {
+    if (payload.background === null) {
+      sets.push("background = NULL");
+    } else if (typeof payload.background === "string") {
+      sets.push("background = ?");
+      vals.push(payload.background.trim());
+    } else {
+      return res.status(400).json({ error: "background_invalid" });
+    }
+  }
+
+  if (payload.posted_by !== undefined) {
+    if (payload.posted_by === null) {
+      sets.push("posted_by = NULL");
+    } else if (typeof payload.posted_by === "string") {
+      sets.push("posted_by = ?");
+      vals.push(payload.posted_by.trim());
+    } else {
+      return res.status(400).json({ error: "posted_by_invalid" });
+    }
+  }
+
+  if (payload.date !== undefined) {
+    if (payload.date === null) {
+      sets.push("date = NULL");
+    } else if (typeof payload.date === "string") {
+      sets.push("date = ?");
+      vals.push(payload.date.trim());
+    } else {
+      return res.status(400).json({ error: "date_invalid" });
+    }
+  }
+
+  if (payload.upvotes !== undefined) {
+    const numeric = Number(payload.upvotes);
+    if (!Number.isFinite(numeric) || numeric < 0) {
+      return res.status(400).json({ error: "upvotes_invalid" });
+    }
+    sets.push("upvotes = ?");
+    vals.push(Math.floor(numeric));
+  }
+
+  if (payload.user_id !== undefined) {
+    if (payload.user_id === null) {
+      sets.push("user_id = NULL");
+    } else {
+      const userId = Number(payload.user_id);
+      if (!Number.isInteger(userId) || userId <= 0) {
+        return res.status(400).json({ error: "user_id_invalid" });
+      }
+      const userExists = db
+        .prepare("SELECT 1 FROM users WHERE id = ?")
+        .get(userId);
+      if (!userExists) {
+        return res.status(404).json({ error: "user_not_found" });
+      }
+      sets.push("user_id = ?");
+      vals.push(userId);
+    }
+  }
+
+  if (!sets.length) {
+    return res.status(400).json({ error: "no_changes" });
+  }
+
+  try {
+    const stmt = db.prepare(
+      `UPDATE questions_book SET ${sets.join(", ")} WHERE id = ?`
+    );
+    stmt.run(...vals, id);
+
+    const row = db
+      .prepare(
+        `SELECT qb.id,
+                qb.question,
+                COALESCE(u.display_name, qb.posted_by) AS posted_by,
+                qb.background,
+                qb.date,
+                qb.user_id,
+                (SELECT COUNT(*) FROM question_upvotes qu WHERE qu.question_id = qb.id) AS upvotes
+         FROM questions_book qb
+         LEFT JOIN users u ON u.id = qb.user_id
+         WHERE qb.id = ?`
+      )
+      .get(id);
+
+    if (!row) return res.status(404).json({ error: "not_found" });
+    res.json(row);
+  } catch (e) {
+    console.error("Admin update questions_book failed:", e);
+    res.status(500).json({ error: "server_error" });
+  }
+});
+
+app.delete("/api/admin/questions_book/:id", (req, res) => {
+  if (!requireAdmin(req, res)) return;
+
+  const id = parseInt(String(req.params.id), 10);
+  if (!id || Number.isNaN(id)) {
+    return res.status(400).json({ error: "invalid_id" });
+  }
+
+  try {
+    const stmt = db.prepare("DELETE FROM questions_book WHERE id = ?");
+    const result = stmt.run(id);
+    if (!result.changes) {
+      return res.status(404).json({ error: "not_found" });
+    }
+    res.json({ ok: true });
+  } catch (e) {
+    console.error("Admin delete questions_book failed:", e);
+    res.status(500).json({ error: "server_error" });
   }
 });
 

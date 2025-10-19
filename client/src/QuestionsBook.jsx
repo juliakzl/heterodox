@@ -401,6 +401,16 @@ export default function QuestionsBook() {
     gap: 12px; 
     margin-top: var(--gap-lg); 
   }
+  .qb .pager .btn {
+    background: #9BA7FA;
+    color: #fff;
+    border-color: #9BA7FA;
+  }
+  .qb .pager .btn[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+    filter: grayscale(0.2);
+  }
   .qb .pager span { min-width: 110px; text-align: center; }
 
   /* Dialog styling */
@@ -609,7 +619,7 @@ export default function QuestionsBook() {
                       aria-expanded={!!openBg[id]}
                       aria-controls={`bg-${id}`}
                     >
-                      {openBg[id] ? "Hide background" : "Show background"}
+                      {openBg[id] ? "Question's story" : "Question's story"}
                     </button>
                   ) : null}
                   <span title={q.date}>{formatDate(q.date)}</span>
