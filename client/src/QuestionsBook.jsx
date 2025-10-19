@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 
 const PAGE_SIZE = 50;
 const PENDING_SUBMISSION_KEY = "qb:pendingSubmission";
@@ -763,7 +764,11 @@ export default function QuestionsBook() {
               return (
                 <li key={id} className="question-card">
                   <div className="row">
-                    <div className="question-text">{q.question}</div>
+                    <div className="question-text">
+                      <Link to={`/question/${id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+                        {q.question}
+                      </Link>
+                    </div>
                     <button
                       className="vote-btn"
                       onClick={() => handleUpvote(q)}

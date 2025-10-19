@@ -903,6 +903,35 @@ app.get("/api/get/questions_book/:id/comments", (req, res) => {
   }
 });
 
+app.get("/api/questions_book/:id", (req, res) => {
+  try {
+    const id = parseInt(String(req.params.id), 10);
+    if (!id || Number.isNaN(id)) return res.status(400).json({ error: "invalid_id" });
+
+    const row = db.prepare(
+      `SELECT qb.id,
+              qb.question,
+              COALESCE(u.display_name, qb.posted_by) AS posted_by,
+              qb.background,
+              qb.date,
+              qb.user_id,
+              (SELECT COUNT(*) FROM question_upvotes qu WHERE qu.question_id = qb.id) AS upvotes,
+              (SELECT COUNT(*) FROM comments c WHERE c.question_id = qb.id) AS comments_total
+       FROM questions_book qb
+       LEFT JOIN users u ON u.id = qb.user_id
+       WHERE qb.id = ? AND COALESCE(qb.hidden, 0) = 0`
+    ).get(id);
+
+    if (!row) return res.status(404).json({ error: "not_found" });
+
+    res.setHeader("Cache-Control", "no-store");
+    return res.json(row);
+  } catch (e) {
+    console.error("GET /api/questions_book/:id failed:", e);
+    return res.status(500).json({ error: "server_error" });
+  }
+});
+
 // ---------- Admin endpoints ----------
 app.patch("/api/admin/questions_book/:id", (req, res) => {
   if (!requireAdmin(req, res)) return;

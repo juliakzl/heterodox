@@ -10,6 +10,7 @@ import bg from './assets/bg-blur.png';
 import Events from "./Events";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import QuestionsBook from "./QuestionsBook";
+import QuestionPage from "./QuestionPage";
 
 export default function App() {
 
@@ -64,6 +65,7 @@ export default function App() {
         <Route path="/events" element={<Events />} />
         <Route path="/questions-book" element={<QuestionsBook />} />
         <Route path="/welcome" element={<WelcomeInvite />} />
+        <Route path="/question/:id" element={<QuestionPage />} />
         <Route
           path="/*"
           element={
