@@ -546,7 +546,7 @@ export default function QuestionsBook() {
     border-color: #9BA7FA;
   }
   .qb .pager .btn[disabled] {
-    opacity: 0.5;
+    opacity: 1;
     cursor: not-allowed;
     filter: grayscale(0.2);
   }

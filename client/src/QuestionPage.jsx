@@ -208,6 +208,7 @@ export default function QuestionPage() {
           flex-direction: column;
           gap: var(--gap);
           color: #9BA7FA;
+          width: 100%;
         }
         .question-page .row {
           display: flex;
@@ -246,6 +247,8 @@ export default function QuestionPage() {
           background: #fff;
           color: var(--text);
           line-height: 1.4;
+          width: 100%;
+          box-sizing: border-box;
         }
         .question-page .background-panel + .background-panel {
           margin-top: var(--gap);
@@ -254,6 +257,7 @@ export default function QuestionPage() {
           display: flex;
           flex-direction: column;
           gap: 12px;
+          width: 100%;
         }
         .question-page .comments-header {
           display: flex;
@@ -383,8 +387,17 @@ export default function QuestionPage() {
             flex-direction: column;
           }
         }
+        .question-page-shell .container {
+          max-width: 880px;
+          margin: 0 auto;
+          padding: 0 16px;
+          box-sizing: border-box;
+        }
       `}</style>
-      <div className="container">
+      <div
+        className="container"
+        style={{ maxWidth: 880, margin: '0 auto', padding: '0 16px', boxSizing: 'border-box' }}
+      >
         <div className="question-page">
           <Link to="/" className="back-link">← Back</Link>
 
