@@ -153,7 +153,7 @@ export default function Nav({ me, onLogout }) {
             height: 32px;
           }
           .nav-inner {
-            padding: clamp(10px, 4vw, 14px) 0;
+            padding: clamp(10px, 4vw, 14px) 20px;
           }
         }
       `}</style>

@@ -208,7 +208,8 @@ export default function QuestionPage() {
           flex-direction: column;
           gap: var(--gap);
           color: #9BA7FA;
-          width: 100%;
+          width: min(100%, var(--content-inner-width, 900px));
+          margin: 0 auto;
         }
         .question-page .row {
           display: flex;
@@ -388,16 +389,13 @@ export default function QuestionPage() {
           }
         }
         .question-page-shell .container {
-          max-width: 880px;
+          max-width: var(--content-max-width, 900px);
           margin: 0 auto;
-          padding: 0 16px;
+          padding: var(--space);
           box-sizing: border-box;
         }
       `}</style>
-      <div
-        className="container"
-        style={{ maxWidth: 880, margin: '0 auto', padding: '0 16px', boxSizing: 'border-box' }}
-      >
+      <div className="container">
         <div className="question-page">
           <Link to="/" className="back-link">← Back</Link>
 

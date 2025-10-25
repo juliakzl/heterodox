@@ -399,9 +399,9 @@ export default function QuestionsBook() {
     --border: #e7e7ea;
     --muted: #5b6270;
     --text: #0f1222;
-    margin: 0 auto; 
-    padding: clamp(12px, 4vw, 32px) 0; 
-    max-width: 100%; 
+    margin: 0 auto;
+    padding: clamp(12px, 4vw, 32px) var(--space, 24px);
+    max-width: 100%;
     color: var(--text);
     width: 100%;
     box-sizing: border-box;

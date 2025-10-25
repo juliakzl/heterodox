@@ -12,6 +12,7 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import QuestionsBook from "./QuestionsBook";
 import QuestionPage from "./QuestionPage";
 import About from "./About";
+import Shuffle from "./Shuffle";
 
 export default function App() {
 
@@ -66,6 +67,7 @@ export default function App() {
         <Route path="/events" element={<Events />} />
         <Route path="/questions-book" element={<QuestionsBook />} />
         <Route path="/about" element={<About me={me} onLogout={logout} />} />
+        <Route path="/shuffle" element={<Shuffle me={me} onLogout={logout} />} />
         <Route path="/welcome" element={<WelcomeInvite />} />
         <Route path="/question/:id" element={<QuestionPage />} />
         <Route
