@@ -53,6 +53,11 @@ export default function Nav({ me, onLogout }) {
     navigate("/about");
   };
 
+  const goToShuffle = () => {
+    setMenuOpen(false);
+    navigate("/shuffle");
+  };
+
   return (
     <div className="nav-shell">
       <style>{`
@@ -61,6 +66,7 @@ export default function Nav({ me, onLogout }) {
           top: 0;
           z-index: 20;
           backdrop-filter: blur(6px);
+          padding: clamp(14px, 3vw, 24px) 0;
         }
         .nav-inner {
           margin: 0 auto;
@@ -69,8 +75,9 @@ export default function Nav({ me, onLogout }) {
           justify-content: space-between;
           gap: 16px;
           width: 100%;
-          max-width: 900px;
-          padding: clamp(12px, 3vw, 20px) 0;
+          max-width: var(--content-max-width, 900px);
+          padding: clamp(12px, 3vw, 20px) var(--space, 24px);
+          box-sizing: border-box;
           position: relative;
         }
         .nav-brand {
@@ -176,6 +183,9 @@ export default function Nav({ me, onLogout }) {
           </button>
           {menuOpen && (
             <div className="nav-menu" role="menu">
+              <button type="button" role="menuitem" onClick={goToShuffle}>
+                Shuffle
+              </button>
               {me ? (
                 <button type="button" role="menuitem" onClick={handleLogout}>
                   Log out

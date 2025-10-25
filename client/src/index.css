@@ -31,6 +31,9 @@
   /* Radii & spacing */
   --radius: 12px;
   --space:  24px;
+
+  --content-max-width: 900px;
+  --content-inner-width: var(--content-max-width);
 }
 
 body {
@@ -39,6 +42,8 @@ body {
   background-size: cover;           /* or 'contain' depending on effect */
   background-position: center;      /* keeps it centered */
   background-attachment: fixed;     /* optional: makes it scroll nicely */
+  min-height: 100vh;
+  overflow-y: scroll;
 }
 
 /* Optional: dark theme hook (add class="theme-dark" on <body> to use) */
@@ -61,13 +66,26 @@ body {
 ---------------------------- */
 * { box-sizing: border-box; }
 
-html, body {
+html {
   margin: 0;
+  min-height: 100%;
+  overflow-y: scroll;
+  scrollbar-gutter: stable both-edges;
+}
+
+html, body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-sans);
   font-size: 16px;
   line-height: var(--line);
+}
+
+body {
+  margin: 0;
+  min-height: 100%;
+  overflow-y: scroll;
+  scrollbar-gutter: stable both-edges;
 }
 
 a { color: inherit; }
@@ -91,9 +109,12 @@ h3 { font-size: var(--h3); font-weight: 600; }
 
 /* Layout */
 .container {
-  max-width: 900px;
+  width: 100%;
+  max-width: var(--content-max-width);
   margin: 0 auto;
-  padding: var(--space);
+  padding: var(--space) 0;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 /* Cards */
