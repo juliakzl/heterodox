@@ -66,7 +66,7 @@ export default function Nav({ me, onLogout }) {
           top: 0;
           z-index: 20;
           backdrop-filter: blur(6px);
-          padding: clamp(14px, 3vw, 24px) 0;
+          padding: clamp(6px, 1.5vw, 12px) 0 clamp(14px, 3vw, 24px) !important;
         }
         .nav-inner {
           margin: 0 auto;
