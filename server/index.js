@@ -862,6 +862,36 @@ app.post("/api/questions_book/:id/comment", (req, res) => {
   }
 });
 
+app.post("/api/questions_book/:id/background", (req, res) => {
+  const me = requireUser(req, res);
+  if (!me) return;
+
+  try {
+    const qid = parseInt(String(req.params.id), 10);
+    if (!qid || Number.isNaN(qid)) return res.status(400).json({ error: "invalid_id" });
+
+    const background = (req.body?.background || "").trim();
+    if (!background) return res.status(400).json({ error: "background_required" });
+
+    const row = db
+      .prepare("SELECT id, user_id, background FROM questions_book WHERE id = ?")
+      .get(qid);
+    if (!row) return res.status(404).json({ error: "not_found" });
+    if (!row.user_id || Number(row.user_id) !== Number(me.id)) {
+      return res.status(403).json({ error: "not_owner" });
+    }
+    if (row.background && row.background.trim()) {
+      return res.status(409).json({ error: "already_has_story" });
+    }
+
+    db.prepare("UPDATE questions_book SET background = ? WHERE id = ?").run(background, qid);
+    return res.json({ ok: true, background });
+  } catch (e) {
+    console.error("POST /api/questions_book/:id/background failed:", e);
+    return res.status(500).json({ error: "server_error" });
+  }
+});
+
 app.get("/api/get/questions_book/:id/comments", (req, res) => {
   try {
     const qid = parseInt(String(req.params.id), 10);

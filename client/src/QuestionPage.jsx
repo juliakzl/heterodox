@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import bg from './assets/bg-blur.png';
 
-export default function QuestionPage() {
+export default function QuestionPage({ me }) {
   const { id: idParam } = useParams();
   const id = Number(idParam);
 
@@ -18,6 +18,9 @@ export default function QuestionPage() {
   const commentDialogRef = useRef(null);
   const [commentText, setCommentText] = useState("");
   const [commentCreating, setCommentCreating] = useState(false);
+  const storyDialogRef = useRef(null);
+  const [storyText, setStoryText] = useState("");
+  const [storySaving, setStorySaving] = useState(false);
 
   // Upvote state
   const [upvoting, setUpvoting] = useState(false);
@@ -152,9 +155,60 @@ export default function QuestionPage() {
     }
   };
 
+  const openStoryModal = () => {
+    setStoryText("");
+    storyDialogRef.current?.showModal?.();
+  };
+  const closeStoryModal = () => {
+    storyDialogRef.current?.close?.();
+    setStoryText("");
+  };
+
+  const submitStory = async (e) => {
+    e.preventDefault();
+    const text = storyText.trim();
+    if (!text) {
+      alert("Please write the question story.");
+      return;
+    }
+    try {
+      setStorySaving(true);
+      const res = await fetch(`/api/questions_book/${id}/background`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ background: text }),
+      });
+      if (res.status === 401) {
+        setStorySaving(false);
+        closeStoryModal();
+        openAuthModal();
+        return;
+      }
+      if (res.status === 409) {
+        closeStoryModal();
+        alert("This question already has a story.");
+        return;
+      }
+      if (!res.ok) throw new Error(`Failed to add story (${res.status})`);
+      setQuestion((q) => (q ? { ...q, background: text } : q));
+      closeStoryModal();
+    } catch (err) {
+      alert(err.message || "Failed to add question story");
+    } finally {
+      setStorySaving(false);
+    }
+  };
+
   if (loading) return <div style={{ padding: 24 }}>Loading…</div>;
   if (error) return <div style={{ padding: 24, color: "var(--danger)" }}>{error}</div>;
   if (!question) return <div style={{ padding: 24 }}>Not found.</div>;
+
+  const trimmedBackground = String(question.background || "").trim();
+  const canAddStory =
+    !!me &&
+    Number(question.user_id) === Number(me?.id) &&
+    !trimmedBackground;
 
   return (
     <div
@@ -253,6 +307,24 @@ export default function QuestionPage() {
         }
         .question-page .background-panel + .background-panel {
           margin-top: var(--gap);
+        }
+        .question-page .add-story-btn {
+          align-self: flex-start;
+          border: 1px dashed var(--border);
+          border-radius: 999px;
+          padding: 10px 16px;
+          background: rgba(155,167,250,0.12);
+          color: #9BA7FA;
+          font-weight: 600;
+          cursor: pointer;
+          transition: transform .05s ease, box-shadow .15s ease, background .2s ease;
+        }
+        .question-page .add-story-btn:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 4px 10px rgba(155,167,250,0.2);
+        }
+        .question-page .add-story-btn:active {
+          transform: translateY(0);
         }
         .question-page .comments-block {
           display: flex;
@@ -415,10 +487,20 @@ export default function QuestionPage() {
               </button>
             </div>
 
-            {String(question.background || "").trim() && (
+            {trimmedBackground ? (
               <div className="background-panel">
                 {question.background}
               </div>
+            ) : (
+              canAddStory && (
+                <button
+                  type="button"
+                  className="add-story-btn"
+                  onClick={openStoryModal}
+                >
+                  + Add question story
+                </button>
+              )
             )}
 
             <div className="meta">
@@ -480,6 +562,36 @@ export default function QuestionPage() {
             <div className="actions">
               <button type="button" className="btn" onClick={closeCommentModal} disabled={commentCreating}>Cancel</button>
               <button type="submit" className="btn primary" disabled={commentCreating}>{commentCreating ? "Submitting…" : "Submit"}</button>
+            </div>
+          </form>
+        </dialog>
+
+        <dialog ref={storyDialogRef} className="question-page-dialog">
+          <form onSubmit={submitStory} method="dialog">
+            <div>
+              <h3>Add question story</h3>
+              <p className="muted" style={{ marginTop: 8 }}>
+                Share the context or background for this question so others can follow along.
+              </p>
+            </div>
+            <div>
+              <label>
+                Story
+                <br />
+                <textarea
+                  value={storyText}
+                  onChange={(e) => setStoryText(e.target.value)}
+                  rows={4}
+                  required
+                  placeholder="Write the story behind this question…"
+                />
+              </label>
+            </div>
+            <div className="actions">
+              <button type="button" className="btn" onClick={closeStoryModal} disabled={storySaving}>Cancel</button>
+              <button type="submit" className="btn primary" disabled={storySaving}>
+                {storySaving ? "Saving…" : "Add story"}
+              </button>
             </div>
           </form>
         </dialog>

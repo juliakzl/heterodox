@@ -69,7 +69,7 @@ export default function App() {
         <Route path="/about" element={<About me={me} onLogout={logout} />} />
         <Route path="/shuffle" element={<Shuffle me={me} onLogout={logout} />} />
         <Route path="/welcome" element={<WelcomeInvite />} />
-        <Route path="/question/:id" element={<QuestionPage />} />
+        <Route path="/question/:id" element={<QuestionPage me={me} />} />
         <Route
           path="/*"
           element={
