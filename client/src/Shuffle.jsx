@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import Nav from "./Nav";
 import bg from "./assets/bg-blur.png";
+import thought from "./assets/thought.png"
 
 const PAGE_LIMIT = 200;
 
@@ -185,26 +186,34 @@ export default function Shuffle({ me, onLogout }) {
         .shuffle-actions {
           display: inline-flex;
           gap: 12px;
+          color: #ffffff !important;
         }
         .shuffle-actions button {
           appearance: none;
-          border: 1px solid rgba(231, 231, 234, 0.9);
+          border: 2px solid rgba(231, 231, 234, 0.95);
           border-radius: 999px;
-          padding: 12px 22px;
-          background: #9BA7FA;
+          padding: clamp(14px, 2.6vw, 20px) clamp(26px, 6vw, 36px);
+          background: linear-gradient(180deg, #A7B2FF 0%, #8E9BFA 100%);
           color: #fff;
-          font-weight: 600;
+          font-weight: 700;
+          font-size: clamp(1.05rem, 2.8vw, 1.2rem);
+          letter-spacing: 0.2px;
           cursor: pointer;
-          transition: transform .05s ease, box-shadow .2s ease, filter .18s ease;
-          box-shadow: 0 12px 24px rgba(155, 167, 250, 0.3);
+          transition: transform .06s ease, box-shadow .22s ease, filter .18s ease, background .22s ease;
+          box-shadow: 0 16px 36px rgba(155, 167, 250, 0.35), 0 2px 0 rgba(15, 18, 34, 0.05) inset;
         }
         .shuffle-actions button:hover {
-          filter: brightness(0.96);
-          transform: translateY(-1px);
+          filter: brightness(0.98);
+          transform: translateY(-2px);
+          box-shadow: 0 22px 44px rgba(155, 167, 250, 0.38);
         }
         .shuffle-actions button:active {
-          transform: translateY(1px);
-          box-shadow: 0 6px 14px rgba(155, 167, 250, 0.26);
+          transform: translateY(1px) scale(0.99);
+          box-shadow: 0 10px 22px rgba(155, 167, 250, 0.32);
+        }
+        .shuffle-actions button:focus-visible {
+          outline: none;
+          box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.9), 0 0 0 6px rgba(155, 167, 250, 0.7), 0 16px 36px rgba(155, 167, 250, 0.35);
         }
         .shuffle-card a {
           color: #9BA7FA;
@@ -242,6 +251,33 @@ export default function Shuffle({ me, onLogout }) {
           .shuffle-card::after {
             inset: 14px;
           }
+          .shuffle-actions button {
+            width: 100%;
+          }
+
+          .shuffle-card .background-panel .panel-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-weight: 600;                 /* a touch lighter than 700 */
+  font-size: clamp(0.75rem, 1.6vw, 0.9rem);  /* smaller text */
+  color: var(--muted, #5b6270);
+  letter-spacing: 0.01em;           /* normal-ish tracking */
+  /* removed: text-transform: uppercase; */
+}
+
+.shuffle-card .background-panel .panel-label img {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.shuffle-card .background-panel .panel-body {
+  color: #0f1222;
+  font-size: clamp(1rem, 2.6vw, 1.15rem);
+  line-height: 1.45;
+}
         }
       `}</style>
       <div className="container">
@@ -270,10 +306,16 @@ export default function Shuffle({ me, onLogout }) {
                   >
                     <p className="question-text">{currentQuestion.question}</p>
                     {hasBackground ? (
-                      <div className="background-panel">
-                        {currentQuestion.background}
-                      </div>
-                    ) : null}
+  <div className="background-panel">
+    <div className="panel-label">
+      <img src={thought} alt="" aria-hidden="true" />
+      <span>Question's story</span>
+    </div>
+    <div className="panel-body">
+      {currentQuestion.background}
+    </div>
+  </div>
+) : null}
                     <div className="question-meta">
                       <span>by {currentQuestion.posted_by ?? currentQuestion.postedBy ?? "—"}</span>
                       {currentQuestion.date ? (

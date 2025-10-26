@@ -400,7 +400,7 @@ export default function QuestionsBook() {
     --muted: #5b6270;
     --text: #0f1222;
     margin: 0 auto;
-    padding: clamp(12px, 4vw, 32px) var(--space, 24px);
+    padding: clamp(6px, 2vw, 16px) var(--space, 24px) clamp(12px, 4vw, 32px);
     max-width: 100%;
     color: var(--text);
     width: 100%;
@@ -417,7 +417,7 @@ export default function QuestionsBook() {
     align-items: center; 
     justify-content: space-between; 
     flex-wrap: nowrap; /* keep items on one line */
-    margin: var(--gap-lg) 0 var(--gap-lg);
+    margin: var(--gap) 0 var(--gap-lg);
   }
   .qb .tabs { display: inline-flex; gap: 6px; border: 1px solid var(--border); padding: 4px; border-radius: 999px; background: #fff; margin: 0; }
   .qb .tab { appearance: none; border: none; background: transparent; padding: 8px 12px; border-radius: 999px; font-weight: 600; cursor: pointer; color: #9BA7FA; }

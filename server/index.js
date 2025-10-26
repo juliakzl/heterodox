@@ -1476,6 +1476,7 @@ app.post("/api/signup/complete", (req, res) => {
   if (!me) return;
 
   const answer = (req.body?.answer || "").trim();
+  const questionStory = (req.body?.questionStory || "").trim();
   const firstName = (req.body?.firstName || "").trim();
   const lastName = (req.body?.lastName || "").trim();
   const city = (req.body?.city || "").trim();
@@ -1534,18 +1535,28 @@ app.post("/api/signup/complete", (req, res) => {
       .prepare("SELECT id FROM questions_book WHERE user_id = ? AND question = ? LIMIT 1")
       .get(me.id, answer);
 
+    const background = questionStory.length ? questionStory : null;
+
     if (!existing) {
       db.prepare(
         `INSERT INTO questions_book (question, posted_by, background, date, upvotes, user_id)
          VALUES (?, ?, ?, ?, 0, ?)`
-      ).run(answer, displayName, null, now, me.id);
+      ).run(answer, displayName, background, now, me.id);
     } else {
+      const sets = [
+        "posted_by = COALESCE(?, posted_by)",
+        "user_id = COALESCE(?, user_id)",
+      ];
+      const vals = [displayName, me.id];
+      if (questionStory.length) {
+        sets.push("background = ?");
+        vals.push(questionStory);
+      }
       db.prepare(
         `UPDATE questions_book
-         SET posted_by = COALESCE(?, posted_by),
-             user_id = COALESCE(?, user_id)
+         SET ${sets.join(", ")}
          WHERE id = ?`
-      ).run(displayName, me.id, existing.id);
+      ).run(...vals, existing.id);
     }
   } catch (e) {
     console.error("Failed to persist signup question into questions_book:", e);
@@ -1560,6 +1571,7 @@ app.post("/api/invite/accept", (req, res) => {
   const me = requireUser(req, res);
   if (!me) return;
   const { token, answer } = req.body || {};
+  const questionStory = (req.body?.questionStory || "").trim();
 
   if (!token || typeof token !== "string") {
     return res.status(400).json({ error: "missing_token" });
@@ -1622,18 +1634,28 @@ app.post("/api/invite/accept", (req, res) => {
       .prepare("SELECT id FROM questions_book WHERE user_id = ? AND question = ? LIMIT 1")
       .get(me.id, trimmedAnswer);
 
+    const background = questionStory.length ? questionStory : null;
+
     if (!existing) {
       db.prepare(
         `INSERT INTO questions_book (question, posted_by, background, date, upvotes, user_id)
          VALUES (?, ?, ?, ?, 0, ?)`
-      ).run(trimmedAnswer, displayName, null, now, me.id);
+      ).run(trimmedAnswer, displayName, background, now, me.id);
     } else {
+      const sets = [
+        "posted_by = COALESCE(?, posted_by)",
+        "user_id = COALESCE(?, user_id)",
+      ];
+      const vals = [displayName, me.id];
+      if (questionStory.length) {
+        sets.push("background = ?");
+        vals.push(questionStory);
+      }
       db.prepare(
         `UPDATE questions_book
-         SET posted_by = COALESCE(?, posted_by),
-             user_id = COALESCE(?, user_id)
+         SET ${sets.join(", ")}
          WHERE id = ?`
-      ).run(displayName, me.id, existing.id);
+      ).run(...vals, existing.id);
     }
   } catch (e) {
     console.error("Failed to persist invite question into questions_book:", e);

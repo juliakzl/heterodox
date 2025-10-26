@@ -11,6 +11,7 @@ import bg from "./assets/bg-blur.png";
 export default function WelcomeInvite() {
   const [step, setStep] = useState(0); // 0 = question, 1 = name+city
   const [answer, setAnswer] = useState("");
+  const [questionStory, setQuestionStory] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [city, setCity] = useState("");
@@ -43,6 +44,7 @@ export default function WelcomeInvite() {
       setBusy(true);
       const payload = {
         answer: answer.trim(),
+        questionStory: questionStory.trim(),
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         city: city.trim(),
@@ -282,6 +284,19 @@ export default function WelcomeInvite() {
               <div className="counter">
                 {answer.trim().length}/{minLen} minimum
               </div>
+            </div>
+            <div className="field">
+              <label htmlFor="questionStory">
+                <span>Question story (optional)</span>
+              </label>
+              <textarea
+                id="questionStory"
+                rows={4}
+                placeholder="Share the story behind this question…"
+                value={questionStory}
+                onChange={(e) => setQuestionStory(e.target.value)}
+                style={{ minHeight: 120 }}
+              />
             </div>
           </div>
         ) : (
