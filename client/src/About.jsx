@@ -26,6 +26,7 @@ export default function About({ me, onLogout }) {
           border-radius: 18px;
           box-shadow: 0 18px 42px rgba(15, 18, 34, 0.12);
           padding: clamp(20px, 5vw, 48px);
+          margin: 0 clamp(16px, 5vw, 36px);
           display: grid;
           gap: 16px;
           color: var(--text, #0f1222);
@@ -49,16 +50,12 @@ export default function About({ me, onLogout }) {
         <Nav me={me} onLogout={onLogout} />
         <section className="about-section">
           <article className="about-card">
-            <h1>About Good Question</h1>
+            <h1>About Good Questions</h1>
             <p>
-              Good Question is a community for exploring the stories, dilemmas, and curiosities
-              shaping our lives. We highlight one thoughtful prompt at a time so members can go deep,
-              reflect, and connect over meaningful answers.
+              Good Questions is a collection of the most interesting questions curated by our community. They might be absurd and paradoxical or thought-provoking and deep. The questions are sorted by the popularity among the community members, and each year we publish 50 best questions of the year.
             </p>
             <p>
-              Each week our team curates new conversation starters, gathers member perspectives, and
-              surfaces standout responses. If you would like to join, choose <strong>Log in</strong> from the
-              menu to create an account or return to your personalized feed.
+              You can also use Good Questions as a conversation aid for your gatherings with friends if you go to <a href="/shuffle" style={{ color: 'var(--link-color, #4b5fff)', textDecoration: 'none', fontWeight: 600 }}>Shuffle</a>.
             </p>
           </article>
         </section>
