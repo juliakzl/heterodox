@@ -892,6 +892,125 @@ app.post("/api/questions_book/:id/background", (req, res) => {
   }
 });
 
+app.get("/api/users/:identifier/questions_book", (req, res) => {
+  try {
+    const rawParam = String(req.params.identifier || "");
+    const rawIdentifier = (() => {
+      try {
+        return decodeURIComponent(rawParam);
+      } catch {
+        return rawParam;
+      }
+    })().trim();
+    if (!rawIdentifier) {
+      return res.status(400).json({ error: "invalid_identifier" });
+    }
+
+    const viewerId = req.session?.user?.id ?? null;
+
+    const baseSelect = `
+      SELECT qb.id,
+             qb.question,
+             COALESCE(u.display_name, qb.posted_by) AS posted_by,
+             qb.background,
+             qb.date,
+             qb.user_id,
+             (SELECT COUNT(*) FROM question_upvotes qu WHERE qu.question_id = qb.id) AS upvotes,
+             (SELECT COUNT(*) FROM comments c WHERE c.question_id = qb.id) AS comments_total,
+             CASE
+               WHEN $viewerId IS NOT NULL AND EXISTS (
+                 SELECT 1 FROM question_upvotes qu
+                 WHERE qu.question_id = qb.id AND qu.user_id = $viewerId
+               )
+               THEN 1 ELSE 0
+             END AS has_upvoted
+      FROM questions_book qb
+      LEFT JOIN users u ON u.id = qb.user_id
+      WHERE COALESCE(qb.hidden, 0) = 0
+    `;
+
+    const orderClause = " ORDER BY datetime(qb.date) DESC, qb.id DESC";
+
+    let rows = [];
+    let user = null;
+
+    const maybeNumeric =
+      rawIdentifier.startsWith("id:")
+        ? rawIdentifier.slice(3)
+        : rawIdentifier;
+
+    const numericId = Number.parseInt(maybeNumeric, 10);
+    const isNumericIdentifier =
+      !Number.isNaN(numericId) &&
+      (rawIdentifier.startsWith("id:") || /^[0-9]+$/.test(rawIdentifier));
+
+    if (isNumericIdentifier) {
+      rows = db
+        .prepare(
+          `${baseSelect}
+             AND qb.user_id = $userId
+           ${orderClause}`
+        )
+        .all({ userId: numericId, viewerId });
+
+      const userRow = db
+        .prepare("SELECT id, display_name, first_name, last_name FROM users WHERE id = ?")
+        .get(numericId);
+
+      const fallbackName =
+        rows?.[0]?.posted_by ||
+        [userRow?.first_name, userRow?.last_name].filter(Boolean).join(" ").trim() ||
+        userRow?.display_name ||
+        (rows.length ? `User #${numericId}` : null);
+
+      if (!userRow && rows.length === 0) {
+        return res.status(404).json({ error: "user_or_questions_not_found" });
+      }
+
+      user = {
+        id: numericId,
+        name:
+          userRow?.display_name ||
+          [userRow?.first_name, userRow?.last_name].filter(Boolean).join(" ").trim() ||
+          fallbackName ||
+          `User #${numericId}`,
+      };
+    } else {
+      const nameIdentifier = rawIdentifier.startsWith("name:")
+        ? rawIdentifier.slice(5)
+        : rawIdentifier;
+      const nameTrimmed = nameIdentifier.trim();
+      if (!nameTrimmed) {
+        return res.status(400).json({ error: "invalid_identifier" });
+      }
+
+      rows = db
+        .prepare(
+          `${baseSelect}
+             AND LOWER(COALESCE(u.display_name, qb.posted_by)) = LOWER($name)
+           ${orderClause}`
+        )
+        .all({ name: nameTrimmed, viewerId });
+
+      if (rows.length === 0) {
+        return res.status(404).json({ error: "user_or_questions_not_found" });
+      }
+
+      const firstRow = rows[0] || {};
+      user = {
+        id: firstRow.user_id ?? null,
+        name: firstRow.posted_by || nameTrimmed,
+      };
+    }
+
+    res.setHeader("Cache-Control", "no-store");
+    return res.json({ data: rows, total: rows.length, user });
+  } catch (e) {
+    console.error("GET /api/users/:identifier/questions_book failed:", e);
+    return res.status(500).json({ error: "server_error" });
+  }
+});
+
 app.get("/api/get/questions_book/:id/comments", (req, res) => {
   try {
     const qid = parseInt(String(req.params.id), 10);

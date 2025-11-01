@@ -177,6 +177,30 @@ export default function Shuffle({ me, onLogout }) {
           line-height: 1.45;
           width: min(100%, 680px);
         }
+
+        .shuffle-card .background-panel .panel-label {
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 6px;
+          font-weight: 600;
+          font-size: clamp(0.9rem, 1.2vw, 1rem);
+          color: var(--muted, #5b6270);
+          letter-spacing: 0.01em;
+        }
+
+        .shuffle-card .background-panel .panel-label img {
+          width: clamp(18px, 1.6vw, 22px);
+          height: clamp(18px, 1.6vw, 22px);
+          display: block;
+        }
+
+        .shuffle-card .background-panel .panel-body {
+          color: #0f1222;
+          font-size: clamp(1rem, 1.1vw, 1.15rem);
+          line-height: 1.45;
+        }
+
         .shuffle-footer {
           display: flex;
           flex-direction: column;
@@ -254,30 +278,6 @@ export default function Shuffle({ me, onLogout }) {
           .shuffle-actions button {
             width: 100%;
           }
-
-          .shuffle-card .background-panel .panel-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
-  font-weight: 600;                 /* a touch lighter than 700 */
-  font-size: clamp(0.75rem, 1.6vw, 0.9rem);  /* smaller text */
-  color: var(--muted, #5b6270);
-  letter-spacing: 0.01em;           /* normal-ish tracking */
-  /* removed: text-transform: uppercase; */
-}
-
-.shuffle-card .background-panel .panel-label img {
-  width: 18px;
-  height: 18px;
-  display: block;
-}
-
-.shuffle-card .background-panel .panel-body {
-  color: #0f1222;
-  font-size: clamp(1rem, 2.6vw, 1.15rem);
-  line-height: 1.45;
-}
         }
       `}</style>
       <div className="container">

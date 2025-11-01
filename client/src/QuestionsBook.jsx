@@ -476,6 +476,12 @@ export default function QuestionsBook() {
     gap: 6px 12px; 
     align-items: center; 
   }
+  .qb .author-link {
+    color: inherit;
+    text-decoration: none;
+    font-weight: inherit;
+  }
+  .qb .author-link:hover { text-decoration: underline; }
   .qb .bg-toggle {
     appearance: none;
     background: transparent;
@@ -806,7 +812,25 @@ export default function QuestionsBook() {
 
                     {/* Second line: posted by + date */}
                     <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', width: '100%' }}>
-                      <span><strong>Posted by:</strong> {q.posted_by ?? q.postedBy ?? "—"}</span>
+                      <span>
+                        <strong>Posted by:</strong>{" "}
+                        {(() => {
+                          const displayName = String(q.posted_by ?? q.postedBy ?? "—").trim() || "—";
+                          if (!displayName || displayName === "—") return displayName;
+                          const hasUserId = q.user_id !== null && q.user_id !== undefined;
+                          const authorIdentifier = hasUserId
+                            ? `id:${q.user_id}`
+                            : `name:${displayName}`;
+                          return (
+                            <Link
+                              to={`/users/${encodeURIComponent(authorIdentifier)}`}
+                              className="author-link"
+                            >
+                              {displayName}
+                            </Link>
+                          );
+                        })()}
+                      </span>
                       <span title={q.date}>{formatDate(q.date)}</span>
                     </div>
                   </div>
@@ -854,14 +878,14 @@ export default function QuestionsBook() {
 
           <div className="pager">
             <button className="btn" onClick={goPrev} disabled={page === 1}>
-              ‹ Prev
+              ‹
             </button>
             <span>
               Page {page}
               {totalPages ? ` of ${totalPages}` : ""}
             </span>
             <button className="btn" onClick={goNext} disabled={totalPages ? page >= totalPages : questions.length < PAGE_SIZE}>
-              Next ›
+              ›
             </button>
           </div>
         </>

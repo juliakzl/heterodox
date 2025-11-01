@@ -13,6 +13,7 @@ import QuestionsBook from "./QuestionsBook";
 import QuestionPage from "./QuestionPage";
 import About from "./About";
 import Shuffle from "./Shuffle";
+import UserQuestions from "./UserQuestions";
 
 export default function App() {
 
@@ -70,6 +71,17 @@ export default function App() {
         <Route path="/shuffle" element={<Shuffle me={me} onLogout={logout} />} />
         <Route path="/welcome" element={<WelcomeInvite />} />
         <Route path="/question/:id" element={<QuestionPage me={me} />} />
+        <Route
+          path="/users/:identifier"
+          element={
+            <div style={{ backgroundImage: `url(${bg})`, backgroundSize: 'cover', backgroundPosition: 'center', minHeight: '100vh' }}>
+              <div className="container">
+                <Nav me={me} onLogout={logout} />
+                <UserQuestions />
+              </div>
+            </div>
+          }
+        />
         <Route
           path="/*"
           element={
