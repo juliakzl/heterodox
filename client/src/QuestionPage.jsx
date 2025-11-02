@@ -31,6 +31,12 @@ export default function QuestionPage({ me }) {
     if (authDialogRef.current?.showModal) authDialogRef.current.showModal();
   };
   const closeAuthModal = () => authDialogRef.current?.close?.();
+  const handleAuthLogin = () => {
+    const next = typeof window !== "undefined" ? window.location.href : "/";
+    closeAuthModal();
+    window.location.href = `/api/auth/google?next=${encodeURIComponent(next)}`;
+  };
+
   const handleAuthSignup = () => {
     closeAuthModal();
     window.location.href = `${window.location.origin}/welcome`;
@@ -423,7 +429,8 @@ export default function QuestionPage({ me }) {
           border: 1px solid var(--border, #e7e7ea);
           border-radius: 16px;
           padding: clamp(18px, 4vw, 26px);
-          max-width: min(520px, 90vw);
+          width: min(720px, 95vw);
+          max-width: none;
         }
         .question-page-shell dialog::backdrop {
           background: rgba(15, 18, 34, 0.35);
@@ -440,7 +447,20 @@ export default function QuestionPage({ me }) {
         }
         .question-page-shell dialog textarea {
           width: 100%;
-          min-height: 140px;
+          min-height: 180px;
+          border: 1px solid var(--border, #e7e7ea);
+          border-radius: 10px;
+          padding: 10px 12px;
+          font: inherit;
+          color: var(--text, #0f1222);
+          box-sizing: border-box;
+        }
+
+        .question-page-shell dialog textarea:focus,
+        .question-page-shell dialog input:focus {
+          outline: none;
+          border-color: #9BA7FA; /* brand color */
+          box-shadow: 0 0 0 3px rgba(155,167,250,0.25);
         }
         .question-page-shell dialog h3 {
           margin: 0;
@@ -535,7 +555,7 @@ export default function QuestionPage({ me }) {
                   ))}
                 </ul>
               ) : (
-                <div className="muted">No comments yet.</div>
+                <div className="muted"></div>
               ))}
             </div>
           </div>
@@ -544,18 +564,16 @@ export default function QuestionPage({ me }) {
         <dialog ref={commentDialogRef} className="question-page-dialog">
           <form onSubmit={submitComment} method="dialog">
             <div>
-              <h3>Add comment</h3>
+              <h3>Share answer</h3>
             </div>
             <div>
               <label>
-                Comment
-                <br />
                 <textarea
                   value={commentText}
                   onChange={(e) => setCommentText(e.target.value)}
                   rows={4}
                   required
-                  placeholder="Write your comment…"
+                  placeholder="Write your answer…"
                 />
               </label>
             </div>
@@ -607,7 +625,8 @@ export default function QuestionPage({ me }) {
             <button type="button" aria-label="Close" className="btn" onClick={closeAuthModal}>✕</button>
           </div>
           <div className="actions" style={{ marginTop: 12 }}>
-            <button type="button" className="btn primary" onClick={handleAuthSignup}>Sign up / Log in</button>
+            <button type="button" className="btn" onClick={handleAuthLogin}>Log in with Google</button>
+            <button type="button" className="btn primary" onClick={handleAuthSignup}>Sign up</button>
           </div>
         </dialog>
       </div>
