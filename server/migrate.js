@@ -100,6 +100,16 @@ function ensureBootstrap(db) {
     // log but don't crash bootstrap; subsequent migrations may handle it
     try { console.warn("ensureBootstrap: hidden column check failed:", e.message); } catch {}
   }
+  // Ensure `anonymous` column exists (boolean 0/1) for questions_book
+  try {
+    const qbCols2 = db.prepare("PRAGMA table_info(questions_book)").all().map(r => r.name);
+    if (!qbCols2.includes("anonymous")) {
+      db.prepare("ALTER TABLE questions_book ADD COLUMN anonymous INTEGER NOT NULL DEFAULT 0").run();
+    }
+    db.exec("CREATE INDEX IF NOT EXISTS idx_questions_book_anonymous ON questions_book(anonymous);");
+  } catch (e) {
+    try { console.warn("ensureBootstrap: anonymous column check failed:", e.message); } catch {}
+  }
 
   // Upvotes table: one row per (question_id, user_id)
   const upvotesSql = `

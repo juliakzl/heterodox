@@ -720,6 +720,7 @@ app.get("/api/questions_book", (req, res) => {
               qb.background,
               qb.date,
               qb.user_id,
+              qb.anonymous,
               (SELECT COUNT(*) FROM question_upvotes qu WHERE qu.question_id = qb.id) AS upvotes
        FROM questions_book qb
        LEFT JOIN users u ON u.id = qb.user_id
@@ -749,6 +750,9 @@ app.post("/api/questions_book", (req, res) => {
     return res.status(400).json({ error: "question_min_3" });
   }
 
+  // Support anonymous flag
+  const anonymousFlag = Number(req.body?.anonymous) ? 1 : 0;
+
   try {
     const userRow = db
       .prepare("SELECT id, display_name, first_name, last_name FROM users WHERE id = ?")
@@ -762,10 +766,10 @@ app.post("/api/questions_book", (req, res) => {
 
     const info = db
       .prepare(
-        `INSERT INTO questions_book (question, posted_by, background, date, upvotes, user_id)
-         VALUES (?, ?, ?, ?, 0, ?)`
+        `INSERT INTO questions_book (question, posted_by, background, date, upvotes, user_id, anonymous)
+         VALUES (?, ?, ?, ?, 0, ?, ?)`
       )
-      .run(qText, displayName, background, nowIso(), me.id);
+      .run(qText, displayName, background, nowIso(), me.id, anonymousFlag);
 
     const row = db
       .prepare(
@@ -775,6 +779,7 @@ app.post("/api/questions_book", (req, res) => {
                 qb.background,
                 qb.date,
                 qb.user_id,
+                qb.anonymous,
                 (SELECT COUNT(*) FROM question_upvotes qu WHERE qu.question_id = qb.id) AS upvotes
          FROM questions_book qb
          LEFT JOIN users u ON u.id = qb.user_id
@@ -1688,8 +1693,8 @@ app.post("/api/signup/complete", (req, res) => {
 
     if (!existing) {
       db.prepare(
-        `INSERT INTO questions_book (question, posted_by, background, date, upvotes, user_id)
-         VALUES (?, ?, ?, ?, 0, ?)`
+        `INSERT INTO questions_book (question, posted_by, background, date, upvotes, user_id, anonymous)
+         VALUES (?, ?, ?, ?, 0, ?, 0)`
       ).run(answer, displayName, background, now, me.id);
     } else {
       const sets = [
@@ -1787,8 +1792,8 @@ app.post("/api/invite/accept", (req, res) => {
 
     if (!existing) {
       db.prepare(
-        `INSERT INTO questions_book (question, posted_by, background, date, upvotes, user_id)
-         VALUES (?, ?, ?, ?, 0, ?)`
+        `INSERT INTO questions_book (question, posted_by, background, date, upvotes, user_id, anonymous)
+         VALUES (?, ?, ?, ?, 0, ?, 0)`
       ).run(trimmedAnswer, displayName, background, now, me.id);
     } else {
       const sets = [

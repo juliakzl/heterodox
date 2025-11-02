@@ -20,6 +20,7 @@ export default function QuestionsBook() {
   const [creating, setCreating] = useState(false);
   const [qText, setQText] = useState("");
   const [background, setBackground] = useState("");
+  const [anonymous, setAnonymous] = useState(false);
   const dialogRef = useRef(null);
   const commentDialogRef = useRef(null);
   const [commentText, setCommentText] = useState("");
@@ -326,6 +327,7 @@ export default function QuestionsBook() {
     setBackground(typeof data.background === "string" ? data.background : "");
     setSort("recent");
     setCreating(false);
+    setAnonymous(false);
     if (dialogRef.current && dialogRef.current.showModal) {
       dialogRef.current.showModal();
     }
@@ -352,7 +354,11 @@ export default function QuestionsBook() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ question: qText.trim(), background: background.trim() || undefined }),
+        body: JSON.stringify({
+          question: qText.trim(),
+          background: background.trim() || undefined,
+          anonymous: anonymous ? 1 : 0,
+        }),
       });
       if (res.status === 401) {
         if (typeof window !== "undefined") {
@@ -572,6 +578,32 @@ export default function QuestionsBook() {
   .qb dialog form > div { margin-bottom: 16px; }
   .qb dialog form > div:last-child { margin-bottom: 0; }
   .qb dialog label { display: block; width: 100%; font-weight: 600; margin-bottom: 6px; }
+  .qb .switch { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
+  .qb .switch input[type="checkbox"] {
+    appearance: none;
+    width: 42px;
+    height: 24px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: #f2f3f7;
+    position: relative;
+    outline: none;
+    transition: background .2s ease, border-color .2s ease;
+  }
+  .qb .switch input[type="checkbox"]::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(0,0,0,.15);
+    transition: transform .2s ease;
+  }
+  .qb .switch input[type="checkbox"]:checked { background: #9BA7FA; border-color: #9BA7FA; }
+  .qb .switch input[type="checkbox"]:checked::after { transform: translateX(18px); }
   .qb dialog textarea, .qb dialog input[type="text"] {
     width: 100%;
     border: 1px solid var(--border);
@@ -724,6 +756,19 @@ export default function QuestionsBook() {
               />
             </label>
           </div>
+          <div>
+            <label className="switch">
+              <input
+                type="checkbox"
+                checked={anonymous}
+                onChange={(e) => setAnonymous(e.target.checked)}
+              />
+              <span>Ask anonymously</span>
+            </label>
+            <div className="muted" style={{ marginTop: 6, fontSize: '0.9em' }}>
+              Your name won't be shown on this question.
+            </div>
+          </div>
           <div className="actions">
             <button type="button" className="btn" onClick={closeDialog} disabled={creating}>Cancel</button>
             <button type="submit" className="btn" disabled={creating}>{creating ? "Submitting…" : "Submit"}</button>
@@ -815,12 +860,14 @@ export default function QuestionsBook() {
                       <span>
                         <strong>Posted by:</strong>{" "}
                         {(() => {
-                          const displayName = String(q.posted_by ?? q.postedBy ?? "—").trim() || "—";
-                          if (!displayName || displayName === "—") return displayName;
+                          // If question is marked anonymous (boolean true or 1), show Anonymous without a link
+                          if (q && (q.anonymous === true || Number(q.anonymous) === 1)) {
+                            return 'Anonymous';
+                          }
+                          const displayName = String(q.posted_by ?? q.postedBy ?? '—').trim() || '—';
+                          if (!displayName || displayName === '—') return displayName;
                           const hasUserId = q.user_id !== null && q.user_id !== undefined;
-                          const authorIdentifier = hasUserId
-                            ? `id:${q.user_id}`
-                            : `name:${displayName}`;
+                          const authorIdentifier = hasUserId ? `id:${q.user_id}` : `name:${displayName}`;
                           return (
                             <Link
                               to={`/users/${encodeURIComponent(authorIdentifier)}`}
