@@ -156,16 +156,59 @@ export default function QuestionsBook() {
     setAuthReturnUrl("");
   };
 
+  const persistPendingSubmission = () => {
+    if (typeof window === "undefined") return;
+    try {
+      if (!qText.trim()) {
+        window.sessionStorage.removeItem(PENDING_SUBMISSION_KEY);
+        return;
+      }
+      window.sessionStorage.setItem(
+        PENDING_SUBMISSION_KEY,
+        JSON.stringify({
+          intent: "questions_submit",
+          question: qText.trim(),
+          background,
+        })
+      );
+    } catch (err) {
+      console.warn("QuestionsBook: unable to persist pending submission", err);
+    }
+  };
+
   const handleAuthLogin = () => {
+    persistPendingSubmission();
     const next = authReturnUrl || window.location.href;
     closeAuthModal();
     window.location.href = `/api/auth/google?next=${encodeURIComponent(next)}`;
   };
 
   const handleAuthSignup = () => {
+    persistPendingSubmission();
     closeAuthModal();
     window.location.href = `${window.location.origin}/welcome`;
   };
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!(dialogRef.current && dialogRef.current.open)) return;
+    if (!qText.trim()) {
+      window.sessionStorage.removeItem(PENDING_SUBMISSION_KEY);
+      return;
+    }
+    try {
+      window.sessionStorage.setItem(
+        PENDING_SUBMISSION_KEY,
+        JSON.stringify({
+          intent: "questions_submit",
+          question: qText.trim(),
+          background,
+        })
+      );
+    } catch (err) {
+      console.warn("QuestionsBook: unable to persist draft", err);
+    }
+  }, [qText, background]);
 
   const handleUpvote = async (q) => {
     const id = q.id ?? q._id; // support either id or _id
