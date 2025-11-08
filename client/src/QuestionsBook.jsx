@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 const PAGE_SIZE = 50;
 const PENDING_SUBMISSION_KEY = "qb:pendingSubmission";
@@ -31,6 +31,14 @@ export default function QuestionsBook() {
   const [commentsMap, setCommentsMap] = useState({}); // { [qid]: { data: Array, total: number } }
   const [commentsLoading, setCommentsLoading] = useState({}); // { [qid]: boolean }
   const [openComments, setOpenComments] = useState({}); // { [qid]: boolean }
+
+  const navigate = useNavigate();
+  const handleCardKeyDown = (id) => (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      navigate(`/question/${id}`);
+    }
+  };
 
   const totalPages = useMemo(() => {
     if (total == null) return null; // unknown
@@ -454,6 +462,10 @@ export default function QuestionsBook() {
     color: var(--text);
     width: 100%;
     box-sizing: border-box;
+    height: 100vh;
+    display: grid;
+    grid-template-rows: auto 1fr;
+    overflow: hidden;
   }
   .qb h1 {
     margin: 0 0 var(--gap);
@@ -507,6 +519,11 @@ export default function QuestionsBook() {
     border-radius: var(--radius); 
     padding: clamp(12px, 2.5vw, 20px); 
     box-shadow: 0 1px 2px rgba(0,0,0,.04);
+  }
+  .qb .question-card.clickable { cursor: pointer; }
+  .qb .scroll-area {
+    min-height: 0; /* needed so grid child can actually shrink and scroll */
+    overflow: auto;
   }
   .qb .row { display: flex; align-items: flex-start; gap: 12px; }
   .qb .question-text { 
@@ -842,144 +859,155 @@ export default function QuestionsBook() {
         </form>
       </dialog>
 
-      {error && (
-        <div>⚠️ {error}</div>
-      )}
+      <div className="scroll-area">
+        {error && (
+          <div>⚠️ {error}</div>
+        )}
 
-      {loading ? (
-        <div>Loading…</div>
-      ) : (
-        <>
-          <ul>
-            {questions.map((q) => {
-              const id = q.id ?? q._id;
-              const bgText = String(q.background ?? q.asked_by ?? q.askedBy ?? "");
-              const commentsCount = Number(q.comments_total ?? commentsMap[id]?.total ?? 0);
-              return (
-                <li key={id} className="question-card">
-                  <div className="row">
-                    <div className="question-text">
-                      <Link to={`/question/${id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                        {q.question}
-                      </Link>
+        {loading ? (
+          <div>Loading…</div>
+        ) : (
+          <>
+            <ul>
+              {questions.map((q) => {
+                const id = q.id ?? q._id;
+                const bgText = String(q.background ?? q.asked_by ?? q.askedBy ?? "");
+                const commentsCount = Number(q.comments_total ?? commentsMap[id]?.total ?? 0);
+                return (
+                  <li
+                    key={id}
+                    className="question-card clickable"
+                    role="link"
+                    tabIndex={0}
+                    aria-label={`Open question: ${q.question}`}
+                    onClick={() => navigate(`/question/${id}`)}
+                    onKeyDown={handleCardKeyDown(id)}
+                  >
+                    <div className="row">
+                      <div className="question-text">
+                        <Link to={`/question/${id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+                          {q.question}
+                        </Link>
+                      </div>
+                      <button
+                        className="vote-btn"
+                        onClick={(e) => { e.stopPropagation(); handleUpvote(q); }}
+                        disabled={!!upvoting[id] || q.has_upvoted === 1 || q.has_upvoted === true}
+                        aria-label="Upvote question"
+                      >
+                        <span className="icon" aria-hidden="true">▲</span>
+                        <span className="count">{q.upvotes ?? 0}</span>
+                      </button>
                     </div>
-                    <button
-                      className="vote-btn"
-                      onClick={() => handleUpvote(q)}
-                      disabled={!!upvoting[id] || q.has_upvoted === 1 || q.has_upvoted === true}
-                      aria-label="Upvote question"
-                    >
-                      <span className="icon" aria-hidden="true">▲</span>
-                      <span className="count">{q.upvotes ?? 0}</span>
-                    </button>
-                  </div>
-                  <div className="meta">
-                    {/* First line: toggles */}
-                    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', width: '100%' }}>
-                      {bgText.trim() ? (
+                    <div className="meta">
+                      {/* First line: toggles */}
+                      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', width: '100%' }}>
+                        {bgText.trim() ? (
+                          <button
+                            type="button"
+                            className="bg-toggle"
+                            onClick={(e) => { e.stopPropagation(); toggleBg(id); }}
+                            aria-expanded={!!openBg[id]}
+                            aria-controls={`bg-${id}`}
+                          >
+                            {openBg[id] ? "Question's story" : "Question's story"}
+                          </button>
+                        ) : null}
                         <button
                           type="button"
                           className="bg-toggle"
-                          onClick={() => toggleBg(id)}
-                          aria-expanded={!!openBg[id]}
-                          aria-controls={`bg-${id}`}
+                          onClick={(e) => { e.stopPropagation(); toggleComments(id); }}
+                          aria-expanded={!!openComments[id]}
+                          aria-controls={`comments-${id}`}
                         >
-                          {openBg[id] ? "Question's story" : "Question's story"}
-                        </button>
-                      ) : null}
-                      <button
-                        type="button"
-                        className="bg-toggle"
-                        onClick={() => toggleComments(id)}
-                        aria-expanded={!!openComments[id]}
-                        aria-controls={`comments-${id}`}
-                      >
-                        {openComments[id] ? "Comments" : `Comments (${commentsCount})`}
-                      </button>
-                    </div>
-
-                    {/* Second line: posted by + date */}
-                    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', width: '100%' }}>
-                      <span>
-                        <strong>Posted by:</strong>{" "}
-                        {(() => {
-                          // If question is marked anonymous (boolean true or 1), show Anonymous without a link
-                          if (q && (q.anonymous === true || Number(q.anonymous) === 1)) {
-                            return 'Anonymous';
-                          }
-                          const displayName = String(q.posted_by ?? q.postedBy ?? '—').trim() || '—';
-                          if (!displayName || displayName === '—') return displayName;
-                          const hasUserId = q.user_id !== null && q.user_id !== undefined;
-                          const authorIdentifier = hasUserId ? `id:${q.user_id}` : `name:${displayName}`;
-                          return (
-                            <Link
-                              to={`/users/${encodeURIComponent(authorIdentifier)}`}
-                              className="author-link"
-                            >
-                              {displayName}
-                            </Link>
-                          );
-                        })()}
-                      </span>
-                      <span title={q.date}>{formatDate(q.date)}</span>
-                    </div>
-                  </div>
-
-                  {bgText.trim() && openBg[id] && (
-                    <div id={`bg-${id}`} className="background-panel">
-                      {bgText}
-                    </div>
-                  )}
-
-                  {openComments[id] && (
-                    <div id={`comments-${id}`} className="background-panel">
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                        <button
-                          type="button"
-                          className="btn"
-                          onClick={() => handleAddComment({ id })}
-                          aria-label="Add comment"
-                        >
-                          Add comment
+                          {openComments[id] ? "Comments" : `Comments (${commentsCount})`}
                         </button>
                       </div>
-                      {commentsLoading[id] ? (
-                        <div>Loading comments…</div>
-                      ) : (commentsMap[id]?.data?.length ? (
-                        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: '10px' }}>
-                          {commentsMap[id].data.map((c) => (
-                            <li key={c.id} style={{borderTop: '1px dashed var(--border)', paddingTop: 8}}>
-                              <div style={{fontSize: '0.95rem'}}>{c.comment}</div>
-                              <div className="muted" style={{fontSize: '0.85rem', marginTop: 4}}>
-                                — {c.user_name || `User #${c.user_id}`} • {formatDate(c.created_at)}
-                              </div>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <div className="muted">No comments yet.</div>
-                      ))}
-                    </div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
 
-          <div className="pager">
-            <button className="btn" onClick={goPrev} disabled={page === 1}>
-              ‹
-            </button>
-            <span>
-              Page {page}
-              {totalPages ? ` of ${totalPages}` : ""}
-            </span>
-            <button className="btn" onClick={goNext} disabled={totalPages ? page >= totalPages : questions.length < PAGE_SIZE}>
-              ›
-            </button>
-          </div>
-        </>
-      )}
+                      {/* Second line: posted by + date */}
+                      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', width: '100%' }}>
+                        <span>
+                          <strong>Posted by:</strong>{" "}
+                          {(() => {
+                            // If question is marked anonymous (boolean true or 1), show Anonymous without a link
+                            if (q && (q.anonymous === true || Number(q.anonymous) === 1)) {
+                              return 'Anonymous';
+                            }
+                            const displayName = String(q.posted_by ?? q.postedBy ?? '—').trim() || '—';
+                            if (!displayName || displayName === '—') return displayName;
+                            const hasUserId = q.user_id !== null && q.user_id !== undefined;
+                            const authorIdentifier = hasUserId ? `id:${q.user_id}` : `name:${displayName}`;
+                            return (
+                              <Link
+                                to={`/users/${encodeURIComponent(authorIdentifier)}`}
+                                className="author-link"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {displayName}
+                              </Link>
+                            );
+                          })()}
+                        </span>
+                        <span title={q.date}>{formatDate(q.date)}</span>
+                      </div>
+                    </div>
+
+                    {bgText.trim() && openBg[id] && (
+                      <div id={`bg-${id}`} className="background-panel">
+                        {bgText}
+                      </div>
+                    )}
+
+                    {openComments[id] && (
+                      <div id={`comments-${id}`} className="background-panel">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                          <button
+                            type="button"
+                            className="btn"
+                            onClick={(e) => { e.stopPropagation(); handleAddComment({ id }); }}
+                            aria-label="Add comment"
+                          >
+                            Add comment
+                          </button>
+                        </div>
+                        {commentsLoading[id] ? (
+                          <div>Loading comments…</div>
+                        ) : (commentsMap[id]?.data?.length ? (
+                          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: '10px' }}>
+                            {commentsMap[id].data.map((c) => (
+                              <li key={c.id} style={{borderTop: '1px dashed var(--border)', paddingTop: 8}}>
+                                <div style={{fontSize: '0.95rem'}}>{c.comment}</div>
+                                <div className="muted" style={{fontSize: '0.85rem', marginTop: 4}}>
+                                  — {c.user_name || `User #${c.user_id}`} • {formatDate(c.created_at)}
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <div className="muted">No comments yet.</div>
+                        ))}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+
+            <div className="pager">
+              <button className="btn" onClick={goPrev} disabled={page === 1}>
+                ‹
+              </button>
+              <span>
+                Page {page}
+                {totalPages ? ` of ${totalPages}` : ""}
+              </span>
+              <button className="btn" onClick={goNext} disabled={totalPages ? page >= totalPages : questions.length < PAGE_SIZE}>
+                ›
+              </button>
+            </div>
+          </>
+        )}
+      </div>
 
       {authModalOpen && (
         <div
