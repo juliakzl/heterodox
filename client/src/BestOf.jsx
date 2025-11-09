@@ -39,6 +39,11 @@ export default function BestOf({ me }) {
       return value;
     }
   };
+  const commentAuthorName = (comment) => {
+    if (!comment) return "—";
+    if (Number(comment.anonymous) === 1) return "Anonymous";
+    return comment.user_name || `User #${comment.user_id}`;
+  };
 
   useEffect(() => {
     if (typeof rawParam !== "undefined") {
@@ -250,7 +255,7 @@ export default function BestOf({ me }) {
                 <div className="best-answer-block">
                   <p className="best-answer-text">{currentComment.comment}</p>
                   <div className="best-answer-meta">
-                    — {currentComment.user_name || `User #${currentComment.user_id}`} •{" "}
+                    — {commentAuthorName(currentComment)} •{" "}
                     {prettyDate(currentComment.created_at)}
                   </div>
                 </div>

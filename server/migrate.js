@@ -134,6 +134,7 @@ function ensureBootstrap(db) {
     user_id INTEGER NOT NULL,
     comment TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    anonymous INTEGER NOT NULL DEFAULT 0,
     bestof INTEGER NOT NULL DEFAULT 0,
     FOREIGN KEY(question_id) REFERENCES questions_book(id),
     FOREIGN KEY(user_id) REFERENCES users(id)
@@ -144,6 +145,9 @@ function ensureBootstrap(db) {
   db.exec(commentsSql);
   try {
     const commentCols = db.prepare("PRAGMA table_info(comments)").all().map((r) => r.name);
+    if (!commentCols.includes("anonymous")) {
+      db.prepare("ALTER TABLE comments ADD COLUMN anonymous INTEGER NOT NULL DEFAULT 0").run();
+    }
     if (!commentCols.includes("bestof")) {
       db.prepare("ALTER TABLE comments ADD COLUMN bestof INTEGER NOT NULL DEFAULT 0").run();
     }

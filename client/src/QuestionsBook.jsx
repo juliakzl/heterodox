@@ -25,6 +25,7 @@ export default function QuestionsBook() {
   const commentDialogRef = useRef(null);
   const [commentText, setCommentText] = useState("");
   const [commentCreating, setCommentCreating] = useState(false);
+  const [commentAnonymous, setCommentAnonymous] = useState(false);
   const [commentTargetId, setCommentTargetId] = useState(null);
 
   // Comments state per question
@@ -261,6 +262,7 @@ export default function QuestionsBook() {
     if (!id) return;
     setCommentTargetId(id);
     setCommentText("");
+    setCommentAnonymous(false);
     if (commentDialogRef.current && commentDialogRef.current.showModal) {
       commentDialogRef.current.showModal();
     }
@@ -271,6 +273,7 @@ export default function QuestionsBook() {
       commentDialogRef.current.close();
     }
     setCommentText("");
+    setCommentAnonymous(false);
     setCommentTargetId(null);
   };
 
@@ -314,7 +317,7 @@ export default function QuestionsBook() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ comment: text })
+        body: JSON.stringify({ comment: text, anonymous: commentAnonymous ? 1 : 0 })
       });
       if (res.status === 401) {
         setCommentCreating(false);
@@ -876,6 +879,17 @@ export default function QuestionsBook() {
               />
             </label>
           </div>
+          <label className="switch">
+            <input
+              type="checkbox"
+              checked={commentAnonymous}
+              onChange={(e) => setCommentAnonymous(e.target.checked)}
+            />
+            <span>Answer anonymously</span>
+          </label>
+          <div className="muted" style={{ marginTop: 6, fontSize: '0.9em' }}>
+            Your name won't be shown on this answer.
+          </div>
           <div className="actions">
             <button type="button" className="btn" onClick={closeCommentModal} disabled={commentCreating}>Cancel</button>
             <button type="submit" className="btn" disabled={commentCreating}>{commentCreating ? "Submitting…" : "Submit"}</button>
@@ -1002,7 +1016,7 @@ export default function QuestionsBook() {
                               <li key={c.id} style={{borderTop: '1px dashed var(--border)', paddingTop: 8}}>
                                 <div style={{fontSize: '0.95rem'}}>{c.comment}</div>
                                 <div className="muted" style={{fontSize: '0.85rem', marginTop: 4}}>
-                                  — {c.user_name || `User #${c.user_id}`} • {formatDate(c.created_at)}
+                                  — {commentAuthorName(c)} • {formatDate(c.created_at)}
                                 </div>
                               </li>
                             ))}
@@ -1091,4 +1105,10 @@ function formatDate(input) {
   const d = new Date(input);
   if (Number.isNaN(d.getTime())) return String(input);
   return d.toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+}
+
+function commentAuthorName(comment) {
+  if (!comment) return "—";
+  if (Number(comment.anonymous) === 1) return "Anonymous";
+  return comment.user_name || `User #${comment.user_id}`;
 }

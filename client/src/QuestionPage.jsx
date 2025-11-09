@@ -19,6 +19,7 @@ export default function QuestionPage({ me }) {
   const commentDialogRef = useRef(null);
   const [commentText, setCommentText] = useState("");
   const [commentCreating, setCommentCreating] = useState(false);
+  const [commentAnonymous, setCommentAnonymous] = useState(false);
   const storyDialogRef = useRef(null);
   const [storyText, setStoryText] = useState("");
   const [storySaving, setStorySaving] = useState(false);
@@ -50,6 +51,11 @@ export default function QuestionPage({ me }) {
       if (Number.isNaN(d.getTime())) return value;
       return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     } catch { return value; }
+  };
+  const commentAuthorName = (comment) => {
+    if (!comment) return "—";
+    if (Number(comment.anonymous) === 1) return "Anonymous";
+    return comment.user_name || `User #${comment.user_id}`;
   };
 
   // Upvote handler (same behavior as list view)
@@ -126,11 +132,13 @@ export default function QuestionPage({ me }) {
 
   const openCommentModal = () => {
     setCommentText("");
+    setCommentAnonymous(false);
     commentDialogRef.current?.showModal?.();
   };
   const closeCommentModal = () => {
     commentDialogRef.current?.close?.();
     setCommentText("");
+    setCommentAnonymous(false);
   };
 
   const submitComment = async (e) => {
@@ -143,7 +151,7 @@ export default function QuestionPage({ me }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ comment: text }),
+        body: JSON.stringify({ comment: text, anonymous: commentAnonymous ? 1 : 0 }),
       });
       if (res.status === 401) {
         setCommentCreating(false);
@@ -291,7 +299,7 @@ export default function QuestionPage({ me }) {
                     <li key={c.id}>
                       <div style={{fontSize: '0.95rem', color: 'var(--text)'}}>{c.comment}</div>
                       <div className="muted" style={{fontSize: '0.85rem', marginTop: 4}}>
-                        — {c.user_name || `User #${c.user_id}`} • {prettyDate(c.created_at)}
+                        — {commentAuthorName(c)} • {prettyDate(c.created_at)}
                       </div>
                     </li>
                   ))}
@@ -318,6 +326,17 @@ export default function QuestionPage({ me }) {
                   placeholder="Write your answer…"
                 />
               </label>
+            </div>
+            <label className="switch" style={{ marginTop: 8 }}>
+              <input
+                type="checkbox"
+                checked={commentAnonymous}
+                onChange={(e) => setCommentAnonymous(e.target.checked)}
+              />
+              <span>Answer anonymously</span>
+            </label>
+            <div className="muted" style={{ marginTop: 6, fontSize: '0.9em' }}>
+              Your name won't be shown on this answer.
             </div>
             <div className="actions">
               <button type="button" className="btn" onClick={closeCommentModal} disabled={commentCreating}>Cancel</button>

@@ -840,6 +840,7 @@ app.post("/api/questions_book/:id/comment", (req, res) => {
 
     const text = (req.body?.comment || "").trim();
     if (!text || text.length < 1) return res.status(400).json({ error: "comment_required" });
+    const anonymousFlag = Number(req.body?.anonymous) ? 1 : 0;
 
     // Ensure question exists
     const qExists = db.prepare("SELECT 1 FROM questions_book WHERE id = ?").get(qid);
@@ -848,13 +849,14 @@ app.post("/api/questions_book/:id/comment", (req, res) => {
     const now = nowIso();
     const info = db
       .prepare(
-        "INSERT INTO comments (question_id, user_id, comment, created_at) VALUES (?, ?, ?, ?)"
+        "INSERT INTO comments (question_id, user_id, comment, created_at, anonymous) VALUES (?, ?, ?, ?, ?)"
       )
-      .run(qid, me.id, text, now);
+      .run(qid, me.id, text, now, anonymousFlag);
 
     const row = db
       .prepare(
         `SELECT c.id, c.question_id, c.user_id, c.comment, c.created_at,
+                COALESCE(c.anonymous, 0) AS anonymous,
                 u.display_name AS user_name
          FROM comments c
          JOIN users u ON u.id = c.user_id
@@ -1057,6 +1059,7 @@ app.get("/api/get/questions_book/:id/comments", (req, res) => {
                 c.user_id,
                 c.comment,
                 c.created_at,
+                COALESCE(c.anonymous, 0) AS anonymous,
                 COALESCE(c.bestof, 0) AS bestof,
                 u.display_name AS user_name
          FROM comments c
