@@ -838,17 +838,15 @@ export default function QuestionsBook() {
 
       <dialog ref={commentDialogRef}>
         <form onSubmit={submitComment} method="dialog">
-          <h3>Add comment</h3>
+          <h3>Add answer</h3>
           <div>
             <label>
-              Comment
-              <br />
               <textarea
                 value={commentText}
                 onChange={(e) => setCommentText(e.target.value)}
                 rows={4}
                 required
-                placeholder="Write your comment…"
+                placeholder="💭"
               />
             </label>
           </div>
@@ -920,7 +918,7 @@ export default function QuestionsBook() {
                           aria-expanded={!!openComments[id]}
                           aria-controls={`comments-${id}`}
                         >
-                          {openComments[id] ? "Comments" : `Comments (${commentsCount})`}
+                          {openComments[id] ? "Answers" : `Answers (${commentsCount})`}
                         </button>
                       </div>
 
@@ -965,13 +963,13 @@ export default function QuestionsBook() {
                             type="button"
                             className="btn"
                             onClick={(e) => { e.stopPropagation(); handleAddComment({ id }); }}
-                            aria-label="Add comment"
+                            aria-label="Add answer"
                           >
-                            Add comment
+                            Add answer
                           </button>
                         </div>
                         {commentsLoading[id] ? (
-                          <div>Loading comments…</div>
+                          <div>Loading answers…</div>
                         ) : (commentsMap[id]?.data?.length ? (
                           <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: '10px' }}>
                             {commentsMap[id].data.map((c) => (
@@ -984,7 +982,7 @@ export default function QuestionsBook() {
                             ))}
                           </ul>
                         ) : (
-                          <div className="muted">No comments yet.</div>
+                          <div className="muted"></div>
                         ))}
                       </div>
                     )}

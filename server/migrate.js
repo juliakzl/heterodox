@@ -134,6 +134,7 @@ function ensureBootstrap(db) {
     user_id INTEGER NOT NULL,
     comment TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    bestof INTEGER NOT NULL DEFAULT 0,
     FOREIGN KEY(question_id) REFERENCES questions_book(id),
     FOREIGN KEY(user_id) REFERENCES users(id)
   );
@@ -141,6 +142,20 @@ function ensureBootstrap(db) {
   CREATE INDEX IF NOT EXISTS idx_comments_user ON comments(user_id);
   `;
   db.exec(commentsSql);
+  try {
+    const commentCols = db.prepare("PRAGMA table_info(comments)").all().map((r) => r.name);
+    if (!commentCols.includes("bestof")) {
+      db.prepare("ALTER TABLE comments ADD COLUMN bestof INTEGER NOT NULL DEFAULT 0").run();
+    }
+    db.exec("CREATE INDEX IF NOT EXISTS idx_comments_bestof ON comments(bestof);");
+    db.exec(
+      "CREATE INDEX IF NOT EXISTS idx_comments_question_bestof ON comments(question_id, bestof);"
+    );
+  } catch (e) {
+    try {
+      console.warn("ensureBootstrap: bestof column check failed:", e.message);
+    } catch {}
+  }
 
   // Defensive column adds on users table
   try {

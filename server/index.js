@@ -1030,7 +1030,22 @@ app.get("/api/get/questions_book/:id/comments", (req, res) => {
     const limit = Math.max(1, Math.min(100, limitRaw));
     const offset = (page - 1) * limit;
 
-    const totalRow = db.prepare("SELECT COUNT(*) AS c FROM comments WHERE question_id = ?").get(qid);
+    const bestOfOnlyValues = new Set(["1", "true", "yes"]);
+    const bestOfOnly =
+      bestOfOnlyValues.has(String(req.query.bestof || "").trim().toLowerCase());
+    const totalFilters = ["question_id = ?"];
+    const commentFilters = ["c.question_id = ?"];
+    if (bestOfOnly) {
+      totalFilters.push("COALESCE(bestof, 0) = 1");
+      commentFilters.push("COALESCE(c.bestof, 0) = 1");
+    }
+    const whereTotal = totalFilters.join(" AND ");
+    const whereComments = commentFilters.join(" AND ");
+    const baseParams = [qid];
+
+    const totalRow = db
+      .prepare(`SELECT COUNT(*) AS c FROM comments WHERE ${whereTotal}`)
+      .get(...baseParams);
     const total = Number(totalRow?.c || 0);
 
     const rows = db
@@ -1040,14 +1055,15 @@ app.get("/api/get/questions_book/:id/comments", (req, res) => {
                 c.user_id,
                 c.comment,
                 c.created_at,
+                COALESCE(c.bestof, 0) AS bestof,
                 u.display_name AS user_name
          FROM comments c
          JOIN users u ON u.id = c.user_id
-         WHERE c.question_id = ?
+         WHERE ${whereComments}
          ORDER BY datetime(c.created_at) ASC, c.id ASC
          LIMIT ? OFFSET ?`
       )
-      .all(qid, limit, offset);
+      .all(...baseParams, limit, offset);
 
     res.setHeader("Cache-Control", "no-store");
     return res.json({ data: rows, total });
@@ -1082,6 +1098,48 @@ app.get("/api/questions_book/:id", (req, res) => {
     return res.json(row);
   } catch (e) {
     console.error("GET /api/questions_book/:id failed:", e);
+    return res.status(500).json({ error: "server_error" });
+  }
+});
+
+app.get("/api/bestof/questions", (req, res) => {
+  try {
+    const limitRaw = parseInt(String(req.query.limit || "10"), 10) || 10;
+    const limit = Math.max(1, Math.min(50, limitRaw));
+
+    const rows = db
+      .prepare(
+        `SELECT qb.id,
+                qb.question,
+                COALESCE(u.display_name, qb.posted_by) AS posted_by,
+                qb.background,
+                qb.date,
+                qb.user_id,
+                (SELECT COUNT(*) FROM question_upvotes qu WHERE qu.question_id = qb.id) AS upvotes,
+                (
+                  SELECT COUNT(*)
+                  FROM comments c
+                  WHERE c.question_id = qb.id
+                    AND COALESCE(c.bestof, 0) = 1
+                ) AS best_answers
+         FROM questions_book qb
+         LEFT JOIN users u ON u.id = qb.user_id
+         WHERE COALESCE(qb.hidden, 0) = 0
+           AND EXISTS (
+             SELECT 1
+             FROM comments c
+             WHERE c.question_id = qb.id
+               AND COALESCE(c.bestof, 0) = 1
+           )
+         ORDER BY datetime(qb.date) DESC, qb.id DESC
+         LIMIT ?`
+      )
+      .all(limit);
+
+    res.setHeader("Cache-Control", "no-store");
+    return res.json({ data: rows });
+  } catch (e) {
+    console.error("GET /api/bestof/questions failed:", e);
     return res.status(500).json({ error: "server_error" });
   }
 });

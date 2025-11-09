@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import bg from './assets/bg-blur.png';
+import questionPageStyles from "./questionPageStyles";
 
 export default function QuestionPage({ me }) {
   const { id: idParam } = useParams();
@@ -228,265 +229,7 @@ export default function QuestionPage({ me }) {
         width: '100%',
       }}
     >
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@400;600;700&display=swap');
-        .question-page-shell {
-          display: flex;
-          flex-direction: column;
-        }
-        .question-page {
-          --gap: 16px;
-          --gap-lg: 24px;
-          --radius: 12px;
-          --border: #e7e7ea;
-          --muted: #5b6270;
-          --text: #0f1222;
-          display: flex;
-          flex-direction: column;
-          gap: var(--gap-lg);
-          padding: clamp(12px, 4vw, 32px) 0;
-          color: var(--text);
-        }
-        .question-page .back-link {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          text-decoration: none;
-          color: var(--muted);
-          font-weight: 600;
-        }
-        .question-page .back-link:hover {
-          color: var(--text);
-        }
-        .question-page .question-card {
-          background: #ffffff;
-          border: 1px solid var(--border);
-          border-radius: var(--radius);
-          padding: clamp(18px, 3vw, 28px);
-          box-shadow: 0 1px 2px rgba(0,0,0,.04);
-          display: flex;
-          flex-direction: column;
-          gap: var(--gap);
-          color: #9BA7FA;
-          width: min(100%, var(--content-inner-width, 900px));
-          margin: 0 auto;
-        }
-        .question-page .row {
-          display: flex;
-          align-items: flex-start;
-          gap: 12px;
-          width: 100%;
-        }
-        .question-page .question-text {
-          font-family: 'Fraunces', var(--font-serif), serif;
-          font-weight: 650;
-          font-size: clamp(1.15rem, 2.2vw, 1.35rem);
-          line-height: 1.4;
-          color: var(--text);
-          margin: 0;
-        }
-        .question-page .meta {
-          font-size: 0.95rem;
-          color: var(--muted);
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-        .question-page .meta-line {
-          display: flex;
-          gap: 12px;
-          flex-wrap: wrap;
-          width: 100%;
-        }
-        .question-page .meta strong {
-          color: var(--text);
-        }
-        .question-page .background-panel {
-          border: 1px dashed var(--border);
-          border-radius: 10px;
-          padding: 12px 14px;
-          background: #fff;
-          color: var(--text);
-          line-height: 1.4;
-          width: 100%;
-          box-sizing: border-box;
-        }
-        .question-page .background-panel + .background-panel {
-          margin-top: var(--gap);
-        }
-        .question-page .add-story-btn {
-          align-self: flex-start;
-          border: 1px dashed var(--border);
-          border-radius: 999px;
-          padding: 10px 16px;
-          background: rgba(155,167,250,0.12);
-          color: #9BA7FA;
-          font-weight: 600;
-          cursor: pointer;
-          transition: transform .05s ease, box-shadow .15s ease, background .2s ease;
-        }
-        .question-page .add-story-btn:hover {
-          transform: translateY(-1px);
-          box-shadow: 0 4px 10px rgba(155,167,250,0.2);
-        }
-        .question-page .add-story-btn:active {
-          transform: translateY(0);
-        }
-        .question-page .comments-block {
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-          width: 100%;
-        }
-        .question-page .comments-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          gap: 12px;
-        }
-        .question-page .comments-list {
-          list-style: none;
-          padding: 0;
-          margin: 0;
-          display: grid;
-          gap: 10px;
-        }
-        .question-page .comments-list li {
-          padding-top: 8px;
-          border-top: 1px dashed var(--border);
-        }
-        .question-page-shell .btn {
-          appearance: none;
-          border: 1px solid var(--border, #e7e7ea);
-          padding: 10px 14px;
-          border-radius: 999px;
-          background: white;
-          cursor: pointer;
-          font-weight: 600;
-          transition: transform .05s ease, box-shadow .2s ease, background .2s ease;
-          box-shadow: 0 1px 2px rgba(0,0,0,.04);
-          color: var(--text, #0f1222);
-        }
-        .question-page-shell .btn.primary {
-          background: #9BA7FA;
-          border-color: #9BA7FA;
-          color: #fff;
-        }
-        .question-page-shell .btn:hover {
-          background: #f4f5f7;
-        }
-        .question-page-shell .btn.primary:hover {
-          filter: brightness(0.95);
-        }
-        .question-page-shell .btn:active {
-          transform: translateY(1px);
-        }
-        .question-page .vote-btn {
-          margin-left: auto;
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          border: 1px solid var(--border);
-          border-radius: 999px;
-          padding: 4px 10px;
-          background: #fff;
-          cursor: pointer;
-          box-shadow: 0 1px 1px rgba(0,0,0,.03);
-          color: #9195E9;
-          font-size: 0.9rem;
-          line-height: 1;
-          flex: 0 0 auto;
-          transition: transform .05s ease, box-shadow .15s ease;
-        }
-        .question-page .vote-btn .icon {
-          color: currentColor;
-          font-size: 1rem;
-          line-height: 1;
-        }
-        .question-page .vote-btn .count {
-          font-weight: 600;
-          color: currentColor;
-        }
-        .question-page .vote-btn:hover {
-          transform: translateY(-1px);
-          box-shadow: 0 2px 4px rgba(0,0,0,.06);
-        }
-        .question-page .vote-btn:active {
-          transform: translateY(0);
-          box-shadow: 0 1px 1px rgba(0,0,0,.03);
-        }
-        .question-page .vote-btn[disabled] {
-          opacity: .6;
-          cursor: not-allowed;
-          transform: none;
-        }
-        .question-page .vote-btn.active {
-          background: rgba(145,149,233,.08);
-          border-color: #9195E9;
-          color: #9195E9;
-        }
-        .question-page-shell dialog {
-          border: 1px solid var(--border, #e7e7ea);
-          border-radius: 16px;
-          padding: clamp(18px, 4vw, 26px);
-          width: min(720px, 95vw);
-          max-width: none;
-        }
-        .question-page-shell dialog::backdrop {
-          background: rgba(15, 18, 34, 0.35);
-        }
-        .question-page-shell dialog form {
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-        }
-        .question-page-shell dialog .actions {
-          display: flex;
-          justify-content: flex-end;
-          gap: 8px;
-        }
-        .question-page-shell dialog textarea {
-          width: 100%;
-          min-height: 180px;
-          border: 1px solid var(--border, #e7e7ea);
-          border-radius: 10px;
-          padding: 10px 12px;
-          font: inherit;
-          color: var(--text, #0f1222);
-          box-sizing: border-box;
-        }
-
-        .question-page-shell dialog textarea:focus,
-        .question-page-shell dialog input:focus {
-          outline: none;
-          border-color: #9BA7FA; /* brand color */
-          box-shadow: 0 0 0 3px rgba(155,167,250,0.25);
-        }
-        .question-page-shell dialog h3 {
-          margin: 0;
-          font-family: 'Fraunces', var(--font-serif), serif;
-        }
-        @media (max-width: 640px) {
-          .question-page .row {
-            flex-direction: column;
-            align-items: stretch;
-          }
-          .question-page .vote-btn {
-            align-self: flex-start;
-            margin-left: 0;
-          }
-          .question-page .comments-header {
-            align-items: flex-start;
-            flex-direction: column;
-          }
-        }
-        .question-page-shell .container {
-          max-width: var(--content-max-width, 900px);
-          margin: 0 auto;
-          padding: var(--space);
-          box-sizing: border-box;
-        }
-      `}</style>
+      <style>{questionPageStyles}</style>
       <div className="container">
         <div className="question-page">
           <Link to="/" className="back-link">← Back</Link>
@@ -532,17 +275,16 @@ export default function QuestionPage({ me }) {
 
             <div className="background-panel comments-block">
               <div className="comments-header">
-                <div style={{ fontWeight: 600, color: 'var(--text)' }}>Comments {commentsTotal ? `(${commentsTotal})` : ''}</div>
                 <button
                   type="button"
                   className="btn primary"
                   onClick={openCommentModal}
                 >
-                  Add comment
+                  Add answer
                 </button>
               </div>
               {commentsLoading ? (
-                <div>Loading comments…</div>
+                <div>Loading answers…</div>
               ) : (comments.length ? (
                 <ul className="comments-list">
                   {comments.map((c) => (

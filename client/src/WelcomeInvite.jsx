@@ -303,7 +303,7 @@ export default function WelcomeInvite() {
           <div className="panel">
             <h2>About you</h2>
             <p className="muted">
-              Tell us who you are so fellow members can find you.
+              Tell us who you are!
             </p>
             <div className="field">
               <label htmlFor="firstName">

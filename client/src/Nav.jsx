@@ -58,6 +58,11 @@ export default function Nav({ me, onLogout }) {
     navigate("/shuffle");
   };
 
+  const goToBestAnswers = () => {
+    setMenuOpen(false);
+    navigate("/bestof");
+  };
+
   return (
     <div className="nav-shell">
       <style>{`
@@ -185,6 +190,9 @@ export default function Nav({ me, onLogout }) {
             <div className="nav-menu" role="menu">
               <button type="button" role="menuitem" onClick={goToShuffle}>
                 Shuffle
+              </button>
+              <button type="button" role="menuitem" onClick={goToBestAnswers}>
+                Best answers
               </button>
               {me ? (
                 <button type="button" role="menuitem" onClick={handleLogout}>

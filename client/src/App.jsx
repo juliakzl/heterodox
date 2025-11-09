@@ -14,6 +14,7 @@ import QuestionPage from "./QuestionPage";
 import About from "./About";
 import Shuffle from "./Shuffle";
 import UserQuestions from "./UserQuestions";
+import BestOf from "./BestOf";
 
 export default function App() {
 
@@ -66,11 +67,29 @@ export default function App() {
     <Router>
       <Routes>
         <Route path="/events" element={<Events />} />
-        <Route path="/questions-book" element={<QuestionsBook />} />
+        <Route
+          path="/questions-book"
+          element={
+            <div
+              style={{
+                backgroundImage: `url(${bg})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                minHeight: '100vh',
+              }}
+            >
+              <div className="container">
+                <Nav me={me} onLogout={logout} tab={tab} setTab={setTab} />
+                <QuestionsBook />
+              </div>
+            </div>
+          }
+        />
         <Route path="/about" element={<About me={me} onLogout={logout} />} />
         <Route path="/shuffle" element={<Shuffle me={me} onLogout={logout} />} />
         <Route path="/welcome" element={<WelcomeInvite />} />
         <Route path="/question/:id" element={<QuestionPage me={me} />} />
+        <Route path="/bestof/:question_id?" element={<BestOf me={me} />} />
         <Route
           path="/users/:identifier"
           element={
