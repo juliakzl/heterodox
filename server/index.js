@@ -713,7 +713,7 @@ app.get("/api/questions_book", (req, res) => {
     const totalRow = db.prepare("SELECT COUNT(*) as c FROM questions_book WHERE COALESCE(hidden, 0) = 0").get();
     const total = Number(totalRow?.c || 0);
 
-    const rows = db.prepare(
+  const rows = db.prepare(
       `SELECT qb.id,
               qb.question,
               COALESCE(u.display_name, qb.posted_by) AS posted_by,
@@ -721,7 +721,8 @@ app.get("/api/questions_book", (req, res) => {
               qb.date,
               qb.user_id,
               qb.anonymous,
-              (SELECT COUNT(*) FROM question_upvotes qu WHERE qu.question_id = qb.id) AS upvotes
+              (SELECT COUNT(*) FROM question_upvotes qu WHERE qu.question_id = qb.id) AS upvotes,
+              (SELECT COUNT(*) FROM comments c WHERE c.question_id = qb.id) AS comments_total
        FROM questions_book qb
        LEFT JOIN users u ON u.id = qb.user_id
        WHERE COALESCE(qb.hidden, 0) = 0
@@ -780,7 +781,8 @@ app.post("/api/questions_book", (req, res) => {
                 qb.date,
                 qb.user_id,
                 qb.anonymous,
-                (SELECT COUNT(*) FROM question_upvotes qu WHERE qu.question_id = qb.id) AS upvotes
+                (SELECT COUNT(*) FROM question_upvotes qu WHERE qu.question_id = qb.id) AS upvotes,
+                (SELECT COUNT(*) FROM comments c WHERE c.question_id = qb.id) AS comments_total
          FROM questions_book qb
          LEFT JOIN users u ON u.id = qb.user_id
          WHERE qb.id = ?`

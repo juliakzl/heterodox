@@ -330,8 +330,34 @@ export default function QuestionsBook() {
         return;
       }
       if (!res.ok) throw new Error(`Comment failed: ${res.status}`);
-      await res.json().catch(() => null);
+      const created = await res.json().catch(() => null);
       closeCommentModal();
+
+      setCommentsMap((prev) => {
+        const prevEntry = prev?.[id];
+        const prevData = Array.isArray(prevEntry?.data) ? prevEntry.data : [];
+        const appended = created && created.id ? [...prevData, created] : prevData;
+        const prevTotal = Number(prevEntry?.total ?? prevData.length) || prevData.length;
+        const nextTotal = prevTotal + 1;
+        const nextEntry = {
+          ...prevEntry,
+          data: appended.length ? appended.slice(-50) : appended,
+          total: nextTotal,
+          error: undefined,
+        };
+        return { ...prev, [id]: nextEntry };
+      });
+
+      setQuestions((qs) =>
+        qs.map((q) => {
+          const qId = q.id ?? q._id;
+          if (String(qId) !== String(id)) return q;
+          const prevTotal = Number(q.comments_total ?? q.commentsTotal ?? 0);
+          const updatedTotal = Number.isFinite(prevTotal) ? prevTotal + 1 : 1;
+          return { ...q, comments_total: updatedTotal };
+        })
+      );
+
       alert("Comment added!");
     } catch (err) {
       alert(err.message || "Failed to add comment");
