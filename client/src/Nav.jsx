@@ -197,7 +197,7 @@ export default function Nav({ me, onLogout }) {
                 Shuffle
               </button>
               <button type="button" role="menuitem" onClick={goToQuestionsBook}>
-                Questions book
+                Questions
               </button>
               <button type="button" role="menuitem" onClick={goToBestAnswers}>
                 Best answers
