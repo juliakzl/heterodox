@@ -486,12 +486,14 @@ export default function QuestionsBook() {
     --muted: #5b6270;
     --text: #0f1222;
     margin: 0 auto;
-    padding: clamp(6px, 2vw, 16px) var(--space, 24px) clamp(12px, 4vw, 32px);
+    padding: clamp(4px, 1.2vw, 10px) var(--space, 24px) clamp(12px, 4vw, 32px);
     max-width: 100%;
     color: var(--text);
     width: 100%;
     box-sizing: border-box;
-    height: 100vh;
+    height: 100%;
+    min-height: 0;
+    max-height: 100%;
     display: grid;
     grid-template-rows: auto 1fr;
     overflow: hidden;

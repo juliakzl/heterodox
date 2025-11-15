@@ -78,7 +78,7 @@ export default function App() {
                 minHeight: '100vh',
               }}
             >
-              <div className="container">
+              <div className="container questions-shell">
                 <Nav me={me} onLogout={logout} tab={tab} setTab={setTab} />
                 <QuestionsBook />
               </div>
@@ -107,7 +107,7 @@ export default function App() {
             <div style={{ backgroundImage: `url(${bg})`, backgroundSize: 'cover', backgroundPosition: 'center', minHeight: '100vh' }}>
               {!me && (
                 <>
-                  <div className="container">
+                  <div className="container questions-shell">
                     <Nav me={me} onLogout={logout} tab={tab} setTab={setTab} />
 
                     {/* MAIN content for unauthenticated users mirrors logged-in Main */}
@@ -121,7 +121,7 @@ export default function App() {
 
               {me && (
                 <>
-                  <div className="container">
+                  <div className={`container ${tab === "Main" ? "questions-shell" : ""}`}>
                     <Nav me={me} onLogout={logout} tab={tab} setTab={setTab} />
 
                     {/* MAIN: This Week’s Question */}
