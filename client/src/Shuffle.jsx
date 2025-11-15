@@ -103,6 +103,9 @@ export default function Shuffle({ me, onLogout, embedded = false }) {
 
   const body = (
     <div className="shuffle-body">
+      <div className="shuffle-pointer">
+        <Link to="/questions-book">All questions →</Link>
+      </div>
       {loading && (
         <div className="shuffle-loading">Loading a great question…</div>
       )}
@@ -196,6 +199,23 @@ export default function Shuffle({ me, onLogout, embedded = false }) {
           padding: clamp(18px, 4vw, 42px) 0 clamp(36px, 6vw, 64px);
           display: grid;
           gap: clamp(16px, 4vw, 32px);
+        }
+        .shuffle-pointer {
+          text-align: right;
+          font-size: clamp(0.9rem, 2vw, 1rem);
+          font-weight: 600;
+          color: #9BA7FA;
+          max-width: var(--content-inner-width, 900px);
+          margin: 0 auto;
+          padding-right: clamp(24px, 5vw, 48px);
+          box-sizing: border-box;
+        }
+        .shuffle-pointer a {
+          color: inherit;
+          text-decoration: none;
+        }
+        .shuffle-pointer a:hover {
+          text-decoration: underline;
         }
         .shuffle-card {
           background: #fff;
@@ -350,8 +370,11 @@ export default function Shuffle({ me, onLogout, embedded = false }) {
           background: rgba(155, 167, 250, 0.12);
         }
         @media (max-width: 640px) {
-          .shuffle-card {
+          .shuffle-card,
+          .shuffle-pointer {
             width: min(100%, 92vw);
+          }
+          .shuffle-card {
             min-height: 420px;
           }
           .shuffle-card::after {
