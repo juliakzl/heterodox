@@ -105,29 +105,22 @@ export default function App() {
           path="/*"
           element={
             <div style={{ backgroundImage: `url(${bg})`, backgroundSize: 'cover', backgroundPosition: 'center', minHeight: '100vh' }}>
-              {!me && (
-                <>
-                  <div className="container questions-shell">
-                    <Nav me={me} onLogout={logout} tab={tab} setTab={setTab} />
+              <div className="container">
+                <Nav me={me} onLogout={logout} tab={tab} setTab={setTab} />
 
-                    {/* MAIN content for unauthenticated users mirrors logged-in Main */}
-                    <>
-                      <QuestionsBook />
-                      <div style={{ marginTop: 16 }} />
-                    </>
-                  </div>
-                </>
-              )}
+                {!me && (
+                  <>
+                    <Shuffle me={me} onLogout={logout} embedded />
+                    <div style={{ marginTop: 16 }} />
+                  </>
+                )}
 
-              {me && (
-                <>
-                  <div className={`container ${tab === "Main" ? "questions-shell" : ""}`}>
-                    <Nav me={me} onLogout={logout} tab={tab} setTab={setTab} />
-
-                    {/* MAIN: This Week’s Question */}
+                {me && (
+                  <>
+                    {/* MAIN: Shuffle is now default view */}
                     {tab === "Main" && (
                       <>
-                        <QuestionsBook />
+                        <Shuffle me={me} onLogout={logout} embedded />
                         <div style={{ marginTop: 16 }} />
                       </>
                     )}
@@ -150,9 +143,9 @@ export default function App() {
 
                     {/* Ask modal only when invoked */}
                     {tab === "Ask" && <Ask onClose={() => setTab("Main")} />}
-                  </div>
-                </>
-              )}
+                  </>
+                )}
+              </div>
             </div>
           }
         />

@@ -8,7 +8,7 @@ const PAGE_LIMIT = 200;
 
 const getId = (q) => q?.id ?? q?._id ?? null;
 
-export default function Shuffle({ me, onLogout }) {
+export default function Shuffle({ me, onLogout, embedded = false }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [questions, setQuestions] = useState([]);
@@ -89,16 +89,90 @@ export default function Shuffle({ me, onLogout }) {
     setReloadToken((token) => token + 1);
   };
 
-  return (
-    <div
-      className="shuffle-shell"
-      style={{
+  const shellClassName = `shuffle-shell${embedded ? " embedded" : ""}`;
+  const shellStyle = embedded
+    ? { '--content-inner-width': '900px', width: '100%' }
+    : {
         '--content-inner-width': '900px',
         backgroundImage: `url(${bg})`,
         backgroundSize: "cover",
         backgroundPosition: "center",
         minHeight: "100vh",
-      }}
+      };
+  const showNav = !embedded;
+
+  const body = (
+    <div className="shuffle-body">
+      {loading && (
+        <div className="shuffle-loading">Loading a great question…</div>
+      )}
+      {!loading && error && (
+        <div className="shuffle-error">
+          <div>{error}</div>
+          <button type="button" onClick={retryLoad}>Try again</button>
+        </div>
+      )}
+      {!loading && !error && !currentQuestion && (
+        <div className="shuffle-empty">No questions available to shuffle yet.</div>
+      )}
+      {!loading && !error && currentQuestion && (
+        <>
+          {(() => {
+            const hasBackground = Boolean(String(currentQuestion.background ?? "").trim());
+            const displayName =
+              currentQuestion &&
+              (currentQuestion.anonymous === true || Number(currentQuestion.anonymous) === 1)
+                ? "Anonymous"
+                : (currentQuestion.posted_by ?? currentQuestion.postedBy ?? "—");
+            return (
+              <article
+                className={`shuffle-card${hasBackground ? "" : " no-story"}`}
+                aria-live="polite"
+              >
+                <p className="question-text">{currentQuestion.question}</p>
+                {hasBackground ? (
+                  <div className="background-panel">
+                    <div className="panel-label">
+                      <img src={thought} alt="" aria-hidden="true" />
+                      <span>Question's story</span>
+                    </div>
+                    <div className="panel-body">
+                      {currentQuestion.background}
+                    </div>
+                  </div>
+                ) : null}
+                <div className="question-meta">
+                  <span>by {displayName}</span>
+                  {currentQuestion.date ? (
+                    <span>{prettyDate(currentQuestion.date)}</span>
+                  ) : null}
+                  {getId(currentQuestion) ? (
+                    <Link to={`/question/${getId(currentQuestion)}`}>Open full thread →</Link>
+                  ) : null}
+                </div>
+              </article>
+            );
+          })()}
+          <div className="shuffle-footer">
+            <div className="shuffle-actions">
+              <button
+                type="button"
+                onClick={selectNext}
+                disabled={shuffling || !questionCount}
+              >
+                {shuffling ? "Shuffling…" : "Shuffle"}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+
+  return (
+    <div
+      className={shellClassName}
+      style={shellStyle}
     >
       <style>{`
         :root { scrollbar-gutter: stable both-edges; }
@@ -106,6 +180,14 @@ export default function Shuffle({ me, onLogout }) {
           display: flex;
           flex-direction: column;
           width: 100%;
+        }
+        .shuffle-shell.embedded {
+          background: transparent;
+          min-height: auto;
+        }
+        .shuffle-shell.embedded .shuffle-body {
+          padding-top: clamp(12px, 3vw, 24px);
+          padding-bottom: clamp(24px, 4vw, 48px);
         }
         .shuffle-body {
           margin: 0 auto;
@@ -280,69 +362,14 @@ export default function Shuffle({ me, onLogout }) {
           }
         }
       `}</style>
-      <div className="container">
-        <Nav me={me} onLogout={onLogout} />
-        <div className="shuffle-body">
-          {loading && (
-            <div className="shuffle-loading">Loading a great question…</div>
-          )}
-          {!loading && error && (
-            <div className="shuffle-error">
-              <div>{error}</div>
-              <button type="button" onClick={retryLoad}>Try again</button>
-            </div>
-          )}
-          {!loading && !error && !currentQuestion && (
-            <div className="shuffle-empty">No questions available to shuffle yet.</div>
-          )}
-          {!loading && !error && currentQuestion && (
-            <>
-              {(() => {
-                const hasBackground = Boolean(String(currentQuestion.background ?? "").trim());
-                return (
-                  <article
-                    className={`shuffle-card${hasBackground ? "" : " no-story"}`}
-                    aria-live="polite"
-                  >
-                    <p className="question-text">{currentQuestion.question}</p>
-                    {hasBackground ? (
-  <div className="background-panel">
-    <div className="panel-label">
-      <img src={thought} alt="" aria-hidden="true" />
-      <span>Question's story</span>
-    </div>
-    <div className="panel-body">
-      {currentQuestion.background}
-    </div>
-  </div>
-) : null}
-                    <div className="question-meta">
-                      <span>by {currentQuestion.posted_by ?? currentQuestion.postedBy ?? "—"}</span>
-                      {currentQuestion.date ? (
-                        <span>{prettyDate(currentQuestion.date)}</span>
-                      ) : null}
-                      {getId(currentQuestion) ? (
-                        <Link to={`/question/${getId(currentQuestion)}`}>Open full thread →</Link>
-                      ) : null}
-                    </div>
-                  </article>
-                );
-              })()}
-              <div className="shuffle-footer">
-                <div className="shuffle-actions">
-                  <button
-                    type="button"
-                    onClick={selectNext}
-                    disabled={shuffling || !questionCount}
-                  >
-                    {shuffling ? "Shuffling…" : "Shuffle"}
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
+      {showNav ? (
+        <div className="container">
+          <Nav me={me} onLogout={onLogout} />
+          {body}
         </div>
-      </div>
+      ) : (
+        body
+      )}
     </div>
   );
 }

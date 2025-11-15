@@ -63,6 +63,11 @@ export default function Nav({ me, onLogout }) {
     navigate("/bestof");
   };
 
+  const goToQuestionsBook = () => {
+    setMenuOpen(false);
+    navigate("/questions-book");
+  };
+
   return (
     <div className="nav-shell">
       <style>{`
@@ -190,6 +195,9 @@ export default function Nav({ me, onLogout }) {
             <div className="nav-menu" role="menu">
               <button type="button" role="menuitem" onClick={goToShuffle}>
                 Shuffle
+              </button>
+              <button type="button" role="menuitem" onClick={goToQuestionsBook}>
+                Questions book
               </button>
               <button type="button" role="menuitem" onClick={goToBestAnswers}>
                 Best answers
