@@ -509,7 +509,7 @@ export default function QuestionsBook() {
     align-items: center; 
     justify-content: space-between; 
     flex-wrap: nowrap; /* keep items on one line */
-    margin: var(--gap) 0 var(--gap-lg);
+    margin: 4px 0 var(--gap-lg);
   }
   .qb .tabs { display: inline-flex; gap: 6px; border: 1px solid var(--border); padding: 4px; border-radius: 999px; background: #fff; margin: 0; }
   .qb .tab { appearance: none; border: none; background: transparent; padding: 8px 12px; border-radius: 999px; font-weight: 600; cursor: pointer; color: #9BA7FA; }
