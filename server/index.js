@@ -149,6 +149,16 @@ function ensureQuestionsBookColumns() {
 }
 
 ensureQuestionsBookColumns();
+function scrubAnonymousOwners() {
+  try {
+    db.prepare(
+      "UPDATE questions_book SET user_id = NULL WHERE anonymous = 1 AND user_id IS NOT NULL"
+    ).run();
+  } catch (err) {
+    console.error("Failed to scrub anonymous question owners:", err);
+  }
+}
+scrubAnonymousOwners();
 
 function requireAdmin(req, res) {
   if (!ADMIN_API_SECRET) {
@@ -753,6 +763,7 @@ app.post("/api/questions_book", (req, res) => {
 
   // Support anonymous flag
   const anonymousFlag = Number(req.body?.anonymous) ? 1 : 0;
+  const authorUserId = anonymousFlag ? null : me.id;
 
   try {
     const userRow = db
@@ -770,7 +781,7 @@ app.post("/api/questions_book", (req, res) => {
         `INSERT INTO questions_book (question, posted_by, background, date, upvotes, user_id, anonymous)
          VALUES (?, ?, ?, ?, 0, ?, ?)`
       )
-      .run(qText, displayName, background, nowIso(), me.id, anonymousFlag);
+      .run(qText, displayName, background, nowIso(), authorUserId, anonymousFlag);
 
     const row = db
       .prepare(
