@@ -276,7 +276,15 @@ export default function QuestionPage({ me }) {
 
             <div className="meta">
               <div className="meta-line">
-                <span><strong>Posted by:</strong> {question.posted_by ?? "—"}</span>
+                <span>
+                  <strong>Posted by:</strong>{" "}
+                  {(() => {
+                    if (Number(question?.anonymous) === 1 || question?.user_id == null) {
+                      return "Anonymous";
+                    }
+                    return question.posted_by ?? "—";
+                  })()}
+                </span>
                 <span title={question.date}>{prettyDate(question.date)}</span>
               </div>
             </div>
