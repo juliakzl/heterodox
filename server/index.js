@@ -726,7 +726,10 @@ app.get("/api/questions_book", (req, res) => {
   const rows = db.prepare(
       `SELECT qb.id,
               qb.question,
-              COALESCE(u.display_name, qb.posted_by) AS posted_by,
+              CASE
+                WHEN qb.anonymous = 1 OR qb.user_id IS NULL THEN 'Anonymous'
+                ELSE COALESCE(u.display_name, qb.posted_by)
+              END AS posted_by,
               qb.background,
               qb.date,
               qb.user_id,
@@ -787,7 +790,10 @@ app.post("/api/questions_book", (req, res) => {
       .prepare(
         `SELECT qb.id,
                 qb.question,
-                COALESCE(u.display_name, qb.posted_by) AS posted_by,
+                CASE
+                  WHEN qb.anonymous = 1 OR qb.user_id IS NULL THEN 'Anonymous'
+                  ELSE COALESCE(u.display_name, qb.posted_by)
+                END AS posted_by,
                 qb.background,
                 qb.date,
                 qb.user_id,
@@ -931,7 +937,10 @@ app.get("/api/users/:identifier/questions_book", (req, res) => {
     const baseSelect = `
       SELECT qb.id,
              qb.question,
-             COALESCE(u.display_name, qb.posted_by) AS posted_by,
+             CASE
+               WHEN qb.anonymous = 1 OR qb.user_id IS NULL THEN 'Anonymous'
+               ELSE COALESCE(u.display_name, qb.posted_by)
+             END AS posted_by,
              qb.background,
              qb.date,
              qb.user_id,
@@ -1007,7 +1016,12 @@ app.get("/api/users/:identifier/questions_book", (req, res) => {
       rows = db
         .prepare(
           `${baseSelect}
-             AND LOWER(COALESCE(u.display_name, qb.posted_by)) = LOWER($name)
+             AND LOWER(
+               CASE
+                 WHEN qb.anonymous = 1 OR qb.user_id IS NULL THEN 'Anonymous'
+                 ELSE COALESCE(u.display_name, qb.posted_by)
+               END
+             ) = LOWER($name)
            ${orderClause}`
         )
         .all({ name: nameTrimmed, viewerId });
@@ -1097,7 +1111,10 @@ app.get("/api/questions_book/:id", (req, res) => {
     const row = db.prepare(
       `SELECT qb.id,
               qb.question,
-              COALESCE(u.display_name, qb.posted_by) AS posted_by,
+              CASE
+                WHEN qb.anonymous = 1 OR qb.user_id IS NULL THEN 'Anonymous'
+                ELSE COALESCE(u.display_name, qb.posted_by)
+              END AS posted_by,
               qb.background,
               qb.date,
               qb.user_id,
@@ -1127,7 +1144,10 @@ app.get("/api/bestof/questions", (req, res) => {
       .prepare(
         `SELECT qb.id,
                 qb.question,
-                COALESCE(u.display_name, qb.posted_by) AS posted_by,
+                CASE
+                  WHEN qb.anonymous = 1 OR qb.user_id IS NULL THEN 'Anonymous'
+                  ELSE COALESCE(u.display_name, qb.posted_by)
+                END AS posted_by,
                 qb.background,
                 qb.date,
                 qb.user_id,
@@ -1255,7 +1275,10 @@ app.patch("/api/admin/questions_book/:id", (req, res) => {
       .prepare(
         `SELECT qb.id,
                 qb.question,
-                COALESCE(u.display_name, qb.posted_by) AS posted_by,
+                CASE
+                  WHEN qb.anonymous = 1 OR qb.user_id IS NULL THEN 'Anonymous'
+                  ELSE COALESCE(u.display_name, qb.posted_by)
+                END AS posted_by,
                 qb.background,
                 qb.date,
                 qb.user_id,
