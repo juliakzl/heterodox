@@ -10,7 +10,7 @@ export default function QuestionsBook() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [page, setPage] = useState(1);
-  const [sort, setSort] = useState("recent"); // "recent" | "popular"
+  const [sort, setSort] = useState("popular"); // "recent" | "popular"
   const [total, setTotal] = useState(null); // total questions, if provided
   const [upvoting, setUpvoting] = useState({}); // { [id]: boolean }
   const [openBg, setOpenBg] = useState({}); // { [id]: boolean }
@@ -63,12 +63,23 @@ export default function QuestionsBook() {
       return Number.isNaN(d.getTime()) ? 0 : d.getTime();
     };
     const up = (q) => Number.isFinite(Number(q.upvotes)) ? Number(q.upvotes) : 0;
+    const answers = (q) => {
+      const val = q?.comments_total ?? q?.commentsTotal ?? q?.comments_total_count;
+      const num = Number(val);
+      return Number.isFinite(num) ? num : 0;
+    };
+    const popularityScore = (q) => up(q) + answers(q);
 
     let sorted = items.slice();
     if (currentSort === "popular") {
       sorted.sort((a, b) => {
+        const dp = popularityScore(b) - popularityScore(a);
+        if (dp !== 0) return dp;
+        const da = answers(b) - answers(a);
+        if (da !== 0) return da;
         const du = up(b) - up(a);
-        return du !== 0 ? du : (safeDate(b) - safeDate(a));
+        if (du !== 0) return du;
+        return safeDate(b) - safeDate(a);
       });
     } else {
       // recent
@@ -800,15 +811,6 @@ export default function QuestionsBook() {
       <div className="topbar">
         <div className="tabs" role="tablist" aria-label="Question views">
           <button
-            type="button"
-            role="tab"
-            aria-selected={sort === "recent"}
-            className={`tab ${sort === "recent" ? "active" : ""}`}
-            onClick={() => { setSort("recent"); setPage(1); }}
-          >
-            By date
-          </button>
-          <button
             role="tab"
             type="button"
             aria-selected={sort === "popular"}
@@ -816,6 +818,15 @@ export default function QuestionsBook() {
             onClick={() => { setSort("popular"); setPage(1); }}
           >
             By popularity
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={sort === "recent"}
+            className={`tab ${sort === "recent" ? "active" : ""}`}
+            onClick={() => { setSort("recent"); setPage(1); }}
+          >
+            By date
           </button>
         </div>
         <button type="button" className="btn" onClick={openDialog}>Ask a question</button>
