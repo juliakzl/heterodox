@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import logo from "./assets/good-q-logo.png";
 import menu from "./assets/menu.svg";
@@ -6,6 +7,7 @@ import menu from "./assets/menu.svg";
 export default function Nav({ me, onLogout }) {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
   const menuContainerRef = useRef(null);
 
   useEffect(() => {
@@ -33,10 +35,8 @@ export default function Nav({ me, onLogout }) {
 
   const handleLogin = () => {
     setMenuOpen(false);
-    if (typeof window === "undefined") return;
-    const { pathname, search } = window.location;
-    const next = `${pathname}${search}`;
-    window.location.href = `/api/auth/google?next=${encodeURIComponent(next || "/")}`;
+    // No session: show the same "Join community" flow used elsewhere
+    setAuthModalOpen(true);
   };
 
   const handleLogout = async () => {
@@ -68,7 +68,24 @@ export default function Nav({ me, onLogout }) {
     navigate("/questions-book");
   };
 
+  const closeAuthModal = () => setAuthModalOpen(false);
+
+  const handleAuthLogin = () => {
+    if (typeof window === "undefined") return;
+    const { pathname, search } = window.location;
+    const next = `${pathname}${search}`;
+    closeAuthModal();
+    window.location.href = `/api/auth/google?next=${encodeURIComponent(next || "/")}`;
+  };
+
+  const handleAuthSignup = () => {
+    if (typeof window === "undefined") return;
+    closeAuthModal();
+    navigate("/welcome");
+  };
+
   return (
+    <>
     <div className="nav-shell">
       <style>{`
         .nav-shell {
@@ -158,6 +175,73 @@ export default function Nav({ me, onLogout }) {
         .nav-menu button:hover {
           background: rgba(155, 167, 250, 0.12);
         }
+        /* Match QuestionsBook auth modal styling */
+        .auth-modal-backdrop {
+          position: fixed;
+          inset: 0;
+          background: rgba(15, 18, 34, 0.42);
+          backdrop-filter: blur(2px);
+          display: grid;
+          place-items: center;
+          /* Keep it below the sticky header so the nav isn't dimmed */
+          z-index: 10;
+          padding: 16px;
+        }
+        .auth-modal {
+          background: #ffffff;
+          border-radius: 16px;
+          box-shadow: 0 18px 48px rgba(15, 18, 34, 0.35);
+          width: min(420px, 92vw);
+          padding: 28px;
+          display: grid;
+          gap: 16px;
+          position: relative;
+          border: 1px solid rgba(231, 231, 234, 0.9);
+        }
+        .auth-modal h3 {
+          margin: 0;
+          font-size: 1.35rem;
+          letter-spacing: -0.01em;
+        }
+        .auth-modal .muted {
+          color: var(--muted, #5b6270);
+        }
+        .auth-modal .actions {
+          display: flex;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+        .auth-modal button {
+          border-radius: 999px;
+          padding: 10px 18px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: transform .05s ease, box-shadow .2s ease, background .2s ease;
+        }
+        .auth-modal button.primary {
+          background: #111321;
+          color: #fff;
+          border: none;
+        }
+        .auth-modal button.primary:hover {
+          filter: brightness(1.05);
+        }
+        .auth-modal button.secondary {
+          border: 1px solid var(--border, #e7e7ea);
+          background: #f6f7fb;
+          color: var(--text, #0f1222);
+        }
+        .auth-close {
+          position: absolute;
+          top: 12px;
+          right: 12px;
+          border: none;
+          background: transparent;
+          font-size: 1.2rem;
+          cursor: pointer;
+          padding: 4px;
+          line-height: 1;
+        }
         @media (max-width: 640px) {
           .nav-logo {
             height: 32px;
@@ -219,5 +303,38 @@ export default function Nav({ me, onLogout }) {
         </div>
       </div>
     </div>
+    {authModalOpen &&
+      typeof document !== "undefined" &&
+      createPortal(
+        <div
+          className="auth-modal-backdrop"
+          role="presentation"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              closeAuthModal();
+            }
+          }}
+        >
+          <div className="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
+            <button className="auth-close" aria-label="Close" onClick={closeAuthModal}>
+              ✕
+            </button>
+            <h3 id="auth-modal-title">Join community</h3>
+            <p className="muted" style={{ margin: 0 }}>
+              You need to log in or sign up to continue.
+            </p>
+            <div className="actions">
+              <button type="button" className="primary" onClick={handleAuthLogin}>
+                Log in with Google
+              </button>
+              <button type="button" className="secondary" onClick={handleAuthSignup}>
+                Sign up
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
   );
 }
