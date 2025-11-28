@@ -10,7 +10,6 @@ import { fileURLToPath } from "url";
 import fs from "fs";
 
 import * as Invites from "./invites.js";
-import * as Signup from "./signup.js";
 const app = express();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -1731,8 +1730,9 @@ app.post("/api/signup/complete", (req, res) => {
   const firstName = (req.body?.firstName || "").trim();
   const lastName = (req.body?.lastName || "").trim();
   const city = (req.body?.city || "").trim();
+  const hasAnswer = answer.length > 0;
 
-  if (!answer || answer.length < 10) {
+  if (hasAnswer && answer.length < 10) {
     return res.status(400).json({ error: "answer_min_10" });
   }
 
@@ -1763,54 +1763,48 @@ app.post("/api/signup/complete", (req, res) => {
     }
   }
 
-  Signup.saveOnboardingAnswer({
-    userId: me.id,
-    token: null,
-    promptKey: "most_interesting_question",
-    answer,
-    createdAt: nowIso(),
-  });
+  if (hasAnswer) {
+    try {
+      const now = nowIso();
+      const userRow = db
+        .prepare("SELECT id, display_name, first_name, last_name FROM users WHERE id = ?")
+        .get(me.id);
+      const displayName =
+        userRow?.display_name ||
+        [userRow?.first_name, userRow?.last_name].filter(Boolean).join(" ").trim() ||
+        me.displayName ||
+        `user:${me.id}`;
 
-  try {
-    const now = nowIso();
-    const userRow = db
-      .prepare("SELECT id, display_name, first_name, last_name FROM users WHERE id = ?")
-      .get(me.id);
-    const displayName =
-      userRow?.display_name ||
-      [userRow?.first_name, userRow?.last_name].filter(Boolean).join(" ").trim() ||
-      me.displayName ||
-      `user:${me.id}`;
+      const existing = db
+        .prepare("SELECT id FROM questions_book WHERE user_id = ? AND question = ? LIMIT 1")
+        .get(me.id, answer);
 
-    const existing = db
-      .prepare("SELECT id FROM questions_book WHERE user_id = ? AND question = ? LIMIT 1")
-      .get(me.id, answer);
+      const background = questionStory.length ? questionStory : null;
 
-    const background = questionStory.length ? questionStory : null;
-
-    if (!existing) {
-      db.prepare(
-        `INSERT INTO questions_book (question, posted_by, background, date, upvotes, user_id, anonymous)
-         VALUES (?, ?, ?, ?, 0, ?, 0)`
-      ).run(answer, displayName, background, now, me.id);
-    } else {
-      const sets = [
-        "posted_by = COALESCE(?, posted_by)",
-        "user_id = COALESCE(?, user_id)",
-      ];
-      const vals = [displayName, me.id];
-      if (questionStory.length) {
-        sets.push("background = ?");
-        vals.push(questionStory);
+      if (!existing) {
+        db.prepare(
+          `INSERT INTO questions_book (question, posted_by, background, date, upvotes, user_id, anonymous)
+           VALUES (?, ?, ?, ?, 0, ?, 0)`
+        ).run(answer, displayName, background, now, me.id);
+      } else {
+        const sets = [
+          "posted_by = COALESCE(?, posted_by)",
+          "user_id = COALESCE(?, user_id)",
+        ];
+        const vals = [displayName, me.id];
+        if (questionStory.length) {
+          sets.push("background = ?");
+          vals.push(questionStory);
+        }
+        db.prepare(
+          `UPDATE questions_book
+           SET ${sets.join(", ")}
+           WHERE id = ?`
+        ).run(...vals, existing.id);
       }
-      db.prepare(
-        `UPDATE questions_book
-         SET ${sets.join(", ")}
-         WHERE id = ?`
-      ).run(...vals, existing.id);
+    } catch (e) {
+      console.error("Failed to persist signup question into questions_book:", e);
     }
-  } catch (e) {
-    console.error("Failed to persist signup question into questions_book:", e);
   }
 
   return res.json({ ok: true });
@@ -1823,12 +1817,13 @@ app.post("/api/invite/accept", (req, res) => {
   if (!me) return;
   const { token, answer } = req.body || {};
   const questionStory = (req.body?.questionStory || "").trim();
+  const trimmedAnswer = (answer || "").trim();
+  const hasAnswer = trimmedAnswer.length > 0;
 
   if (!token || typeof token !== "string") {
     return res.status(400).json({ error: "missing_token" });
   }
-  const trimmedAnswer = (answer || "").trim();
-  if (!trimmedAnswer || trimmedAnswer.length < 10) {
+  if (hasAnswer && trimmedAnswer.length < 10) {
     return res.status(400).json({ error: "answer_min_10" });
   }
 
@@ -1861,55 +1856,48 @@ app.post("/api/invite/accept", (req, res) => {
     }
   }
 
-  // persist onboarding answer
-  Signup.saveOnboardingAnswer({
-    userId: me.id,
-    token,
-    promptKey: "most_interesting_question",
-    answer: trimmedAnswer,
-    createdAt: nowIso(),
-  });
+  if (hasAnswer) {
+    try {
+      const now = nowIso();
+      const userRow = db
+        .prepare("SELECT id, display_name, first_name, last_name FROM users WHERE id = ?")
+        .get(me.id);
+      const displayName =
+        userRow?.display_name ||
+        [userRow?.first_name, userRow?.last_name].filter(Boolean).join(" ").trim() ||
+        me.displayName ||
+        `user:${me.id}`;
 
-  try {
-    const now = nowIso();
-    const userRow = db
-      .prepare("SELECT id, display_name, first_name, last_name FROM users WHERE id = ?")
-      .get(me.id);
-    const displayName =
-      userRow?.display_name ||
-      [userRow?.first_name, userRow?.last_name].filter(Boolean).join(" ").trim() ||
-      me.displayName ||
-      `user:${me.id}`;
+      const existing = db
+        .prepare("SELECT id FROM questions_book WHERE user_id = ? AND question = ? LIMIT 1")
+        .get(me.id, trimmedAnswer);
 
-    const existing = db
-      .prepare("SELECT id FROM questions_book WHERE user_id = ? AND question = ? LIMIT 1")
-      .get(me.id, trimmedAnswer);
+      const background = questionStory.length ? questionStory : null;
 
-    const background = questionStory.length ? questionStory : null;
-
-    if (!existing) {
-      db.prepare(
-        `INSERT INTO questions_book (question, posted_by, background, date, upvotes, user_id, anonymous)
-         VALUES (?, ?, ?, ?, 0, ?, 0)`
-      ).run(trimmedAnswer, displayName, background, now, me.id);
-    } else {
-      const sets = [
-        "posted_by = COALESCE(?, posted_by)",
-        "user_id = COALESCE(?, user_id)",
-      ];
-      const vals = [displayName, me.id];
-      if (questionStory.length) {
-        sets.push("background = ?");
-        vals.push(questionStory);
+      if (!existing) {
+        db.prepare(
+          `INSERT INTO questions_book (question, posted_by, background, date, upvotes, user_id, anonymous)
+           VALUES (?, ?, ?, ?, 0, ?, 0)`
+        ).run(trimmedAnswer, displayName, background, now, me.id);
+      } else {
+        const sets = [
+          "posted_by = COALESCE(?, posted_by)",
+          "user_id = COALESCE(?, user_id)",
+        ];
+        const vals = [displayName, me.id];
+        if (questionStory.length) {
+          sets.push("background = ?");
+          vals.push(questionStory);
+        }
+        db.prepare(
+          `UPDATE questions_book
+           SET ${sets.join(", ")}
+           WHERE id = ?`
+        ).run(...vals, existing.id);
       }
-      db.prepare(
-        `UPDATE questions_book
-         SET ${sets.join(", ")}
-         WHERE id = ?`
-      ).run(...vals, existing.id);
+    } catch (e) {
+      console.error("Failed to persist invite question into questions_book:", e);
     }
-  } catch (e) {
-    console.error("Failed to persist invite question into questions_book:", e);
   }
 
   // mark invite accepted
