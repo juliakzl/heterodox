@@ -490,14 +490,14 @@ export default function QuestionsBook() {
       <style>{`
   @import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@400;600;700&display=swap');
   .qb { 
-    --gap: 16px; 
-    --gap-lg: 24px;
+    --gap: 12px; 
+    --gap-lg: 18px;
     --radius: 12px;
     --border: #e7e7ea;
     --muted: #5b6270;
     --text: #0f1222;
     margin: 0 auto;
-    padding: clamp(4px, 1.2vw, 10px) var(--space, 24px) clamp(12px, 4vw, 32px);
+    padding: clamp(0px, 1vw, 8px) var(--space, 24px) clamp(12px, 4vw, 32px);
     max-width: 100%;
     color: var(--text);
     width: 100%;
@@ -510,17 +510,17 @@ export default function QuestionsBook() {
     overflow: hidden;
   }
   .qb h1 {
-    margin: 0 0 var(--gap);
+    margin: 0 0 8px;
     font-size: clamp(1.5rem, 2.5vw, 2rem);
     letter-spacing: -0.01em;
   }
   .qb .topbar { 
     display: flex; 
-    gap: var(--gap);
+    gap: 10px;
     align-items: center; 
     justify-content: space-between; 
     flex-wrap: nowrap; /* keep items on one line */
-    margin: 4px 0 var(--gap-lg);
+    margin: 2px 0 10px;
   }
   .qb .tabs { display: inline-flex; gap: 6px; border: 1px solid var(--border); padding: 4px; border-radius: 999px; background: #fff; margin: 0; }
   .qb .tab { appearance: none; border: none; background: transparent; padding: 8px 12px; border-radius: 999px; font-weight: 600; cursor: pointer; color: #9BA7FA; }
@@ -552,7 +552,7 @@ export default function QuestionsBook() {
     margin: 0; 
     padding: 0; 
     display: grid; 
-    gap: var(--gap);
+    gap: calc(var(--gap) - 2px);
   }
   .qb .question-card { 
     color: #9BA7FA;
@@ -561,13 +561,15 @@ export default function QuestionsBook() {
     border-radius: var(--radius); 
     padding: clamp(12px, 2.5vw, 20px); 
     box-shadow: 0 1px 2px rgba(0,0,0,.04);
+    position: relative;
+    padding-right: calc(clamp(12px, 2.5vw, 20px) + 54px); /* leave room for floating vote */
   }
   .qb .question-card.clickable { cursor: pointer; }
   .qb .scroll-area {
     min-height: 0; /* needed so grid child can actually shrink and scroll */
     overflow: auto;
   }
-  .qb .row { display: flex; align-items: flex-start; gap: 12px; }
+  .qb .row { display: flex; align-items: flex-start; gap: 12px; flex-wrap: nowrap; }
   .qb .question-text { 
     font-family: 'Fraunces', serif;
     font-weight: 650; 
@@ -575,6 +577,9 @@ export default function QuestionsBook() {
     line-height: 1.35; 
     margin: 0 0 8px; 
     color: var(--text);
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
   .qb .meta { 
     color: inherit; 
@@ -621,6 +626,8 @@ export default function QuestionsBook() {
     color: inherit;
     font-size: 0.98rem;
     line-height: 1.4;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
   .qb .dot { opacity: .6; }
 
@@ -642,10 +649,45 @@ export default function QuestionsBook() {
     width: auto;
     white-space: nowrap;
     min-width: 0;
+    position: absolute;
+    top: clamp(12px, 2.5vw, 20px);
+    right: clamp(12px, 2.5vw, 20px);
   }
   .qb .vote-btn .icon { color: currentColor; font-size: 1rem; line-height: 1; }
   .qb .vote-btn .count { font-weight: 600; color: currentColor; }
   .qb .vote-btn[disabled] { opacity: .6; cursor: not-allowed; }
+
+  @media (max-width: 540px) {
+    .qb {
+      padding: 8px 12px 18px;
+      gap: 12px;
+    }
+    .qb .topbar {
+      flex-wrap: nowrap;
+      gap: 8px;
+    }
+    .qb .tabs {
+      flex-wrap: nowrap;
+      flex-shrink: 1;
+      min-width: 0;
+    }
+    .qb .tab {
+      padding: 8px 10px;
+    }
+    .qb .topbar .btn {
+      flex-shrink: 0;
+      width: auto;
+      white-space: nowrap;
+    }
+    .qb .question-card {
+      padding: 14px;
+      padding-right: calc(14px + 54px);
+    }
+    .qb .row {
+      gap: 10px;
+      flex-wrap: nowrap;
+    }
+  }
 
   .qb .pager { 
     display: flex; 

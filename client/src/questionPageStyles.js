@@ -40,10 +40,12 @@ const questionPageStyles = `
           color: #9BA7FA;
           width: min(100%, var(--content-inner-width, 900px));
           margin: 0 auto;
+          position: relative;
+          padding-right: calc(clamp(18px, 3vw, 28px) + 60px);
         }
         .question-page .row {
           display: flex;
-          align-items: center;
+          align-items: flex-start;
           gap: 12px;
           width: 100%;
           flex-wrap: nowrap;
@@ -56,6 +58,9 @@ const questionPageStyles = `
           color: var(--text);
           margin: 0;
           flex: 1 1 auto;
+          min-width: 0;
+          word-break: break-word;
+          overflow-wrap: anywhere;
         }
         .question-page .meta {
           font-size: 0.95rem;
@@ -82,6 +87,8 @@ const questionPageStyles = `
           line-height: 1.4;
           width: 100%;
           box-sizing: border-box;
+          overflow-wrap: anywhere;
+          word-break: break-word;
         }
         .question-page .background-panel + .background-panel {
           margin-top: var(--gap);
@@ -169,6 +176,9 @@ const questionPageStyles = `
           line-height: 1;
           flex: 0 0 auto;
           transition: transform .05s ease, box-shadow .15s ease;
+          position: absolute;
+          top: clamp(18px, 3vw, 28px);
+          right: clamp(18px, 3vw, 28px);
         }
         .question-page .vote-btn .icon {
           color: currentColor;
@@ -249,6 +259,19 @@ const questionPageStyles = `
           margin: 0 auto;
           padding: var(--space);
           box-sizing: border-box;
+        }
+        @media (max-width: 560px) {
+          .question-page-shell .container {
+            padding: 14px;
+          }
+          .question-page .question-card {
+            padding: 16px;
+            padding-right: calc(16px + 60px);
+          }
+          .question-page .row {
+            gap: 10px;
+            flex-wrap: nowrap;
+          }
         }
         .question-page .page-title {
           font-family: 'Fraunces', var(--font-serif), serif;

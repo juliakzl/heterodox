@@ -120,8 +120,8 @@ h3 { font-size: var(--h3); font-weight: 600; }
 .container.questions-shell {
   display: flex;
   flex-direction: column;
-  gap: clamp(4px, 1.5vw, 14px);
-  padding: clamp(4px, 1vw, 12px) 0 clamp(8px, 1.5vw, 14px);
+  gap: clamp(2px, 1vw, 10px);
+  padding: clamp(2px, 0.5vw, 8px) 0 clamp(8px, 1.5vw, 14px);
   height: 100dvh;
   max-height: 100dvh;
   overflow: hidden;
@@ -140,19 +140,19 @@ h3 { font-size: var(--h3); font-weight: 600; }
 }
 
 .container.questions-shell .nav-shell {
-  padding-bottom: clamp(6px, 1.5vw, 12px) !important;
+  padding-bottom: 0 !important;
 }
 
 /* Tighten spacing for the navigation wrapper and any container inside it */
 .nav-shell { 
-  padding-top: clamp(0px, 0.5vw, 6px) !important;
+  padding-top: clamp(0px, 0.3vw, 4px) !important;
 }
 .nav-shell .container {
   padding-top: 0 !important;
   padding-bottom: 0 !important;
 }
 .nav-inner {
-  padding-top: clamp(4px, 1.2vw, 10px) !important;
+  padding-top: clamp(2px, 0.8vw, 8px) !important;
 }
 
 /* Cards */
