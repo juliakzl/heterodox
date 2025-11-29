@@ -38,17 +38,15 @@ const questionPageStyles = `
           flex-direction: column;
           gap: var(--gap);
           color: #9BA7FA;
-          width: min(100%, var(--content-inner-width, 900px));
-          margin: 0 auto;
-          position: relative;
-          padding-right: calc(clamp(18px, 3vw, 28px) + 60px);
+          width: 100%;
+          margin: 0;
         }
         .question-page .row {
           display: flex;
           align-items: flex-start;
           gap: 12px;
           width: 100%;
-          flex-wrap: nowrap;
+          flex-wrap: wrap;
         }
         .question-page .question-text {
           font-family: 'Fraunces', var(--font-serif), serif;
@@ -72,11 +70,24 @@ const questionPageStyles = `
         .question-page .meta-line {
           display: flex;
           gap: 12px;
-          flex-wrap: wrap;
+          flex-wrap: nowrap;
           width: 100%;
+          align-items: center;
+        }
+        .question-page .meta-line .posted-by {
+          flex: 1 1 auto;
+          min-width: 0;
+          overflow-wrap: anywhere;
         }
         .question-page .meta strong {
           color: var(--text);
+        }
+        .question-page .meta-line .spacer {
+          flex: 1 1 auto;
+        }
+        .question-page .meta-date {
+          font-size: 0.9rem;
+          color: var(--muted);
         }
         .question-page .background-panel {
           border: 1px dashed var(--border);
@@ -176,9 +187,6 @@ const questionPageStyles = `
           line-height: 1;
           flex: 0 0 auto;
           transition: transform .05s ease, box-shadow .15s ease;
-          position: absolute;
-          top: clamp(18px, 3vw, 28px);
-          right: clamp(18px, 3vw, 28px);
         }
         .question-page .vote-btn .icon {
           color: currentColor;
@@ -255,9 +263,10 @@ const questionPageStyles = `
           }
         }
         .question-page-shell .container {
-          max-width: var(--content-max-width, 900px);
+          max-width: 1100px;
+          width: 100%;
           margin: 0 auto;
-          padding: var(--space);
+          padding: clamp(14px, 3vw, 24px);
           box-sizing: border-box;
         }
         @media (max-width: 560px) {
@@ -266,11 +275,10 @@ const questionPageStyles = `
           }
           .question-page .question-card {
             padding: 16px;
-            padding-right: calc(16px + 60px);
           }
           .question-page .row {
             gap: 10px;
-            flex-wrap: nowrap;
+            flex-wrap: wrap;
           }
         }
         .question-page .page-title {

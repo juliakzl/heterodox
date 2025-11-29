@@ -247,15 +247,6 @@ export default function QuestionPage({ me }) {
               <div className="question-text">
                 {question.question}
               </div>
-              <button
-                className={`vote-btn ${question?.has_upvoted ? 'active' : ''}`}
-                onClick={handleUpvote}
-                disabled={upvoting || question?.has_upvoted === 1 || question?.has_upvoted === true}
-                aria-label="Upvote question"
-              >
-                <span className="icon" aria-hidden="true">▲</span>
-                <span className="count">{question?.upvotes ?? 0}</span>
-              </button>
             </div>
 
             {trimmedBackground ? (
@@ -276,7 +267,7 @@ export default function QuestionPage({ me }) {
 
             <div className="meta">
               <div className="meta-line">
-                <span>
+                <span className="posted-by">
                   <strong>Posted by:</strong>{" "}
                   {(() => {
                     if (Number(question?.anonymous) === 1 || question?.user_id == null) {
@@ -285,8 +276,18 @@ export default function QuestionPage({ me }) {
                     return question.posted_by ?? "—";
                   })()}
                 </span>
-                <span title={question.date}>{prettyDate(question.date)}</span>
+                <span className="spacer" />
+                <button
+                  className={`vote-btn ${question?.has_upvoted ? 'active' : ''}`}
+                  onClick={handleUpvote}
+                  disabled={upvoting || question?.has_upvoted === 1 || question?.has_upvoted === true}
+                  aria-label="Upvote question"
+                >
+                  <span className="icon" aria-hidden="true">▲</span>
+                  <span className="count">{question?.upvotes ?? 0}</span>
+                </button>
               </div>
+              <div className="meta-date" title={question.date}>{prettyDate(question.date)}</div>
             </div>
 
             <div className="background-panel comments-block">
